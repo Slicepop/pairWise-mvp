@@ -108,6 +108,28 @@ export default function Auth() {
     }
   };
 
+  const handleGoogleSignIn = async () => {
+    setLoading(true);
+    resetMessages();
+
+    try {
+      const { error } = await supabase.auth.signInWithOAuth({
+        provider: "google",
+        options: {
+          redirectTo: `${window.location.origin}/dashboard`,
+        },
+      });
+
+      if (error) {
+        setErrorMsg(error.message);
+      }
+    } catch (err: any) {
+      setErrorMsg(err?.message ?? "Google sign-in failed.");
+    } finally {
+      setLoading(false);
+    }
+  };
+
   const handleResetPassword = async () => {
     resetMessages();
     if (!email) {
@@ -340,25 +362,45 @@ export default function Auth() {
             <div className="flex gap-3">
               <button
                 type="button"
-                onClick={() => {
-                  // Example: uncomment and adapt for supabase OAuth sign-in
-                  // supabase.auth.signInWithOAuth({ provider: "google" });
-                }}
-                className="flex-1 inline-flex items-center justify-center gap-2 rounded-lg border border-gray-200 px-3 py-2 bg-white text-sm hover:bg-gray-50"
+                onClick={handleGoogleSignIn}
+                disabled={loading}
+                className="flex-1 inline-flex items-center justify-center gap-2 rounded-lg border border-gray-200 px-3 py-2 bg-white text-sm hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed"
               >
-                <svg
-                  className="h-4 w-4"
-                  viewBox="0 0 24 24"
-                  fill="none"
-                  stroke="currentColor"
-                  strokeWidth="1.5"
-                >
-                  <path d="M21 12.3c0-.7-.1-1.3-.2-1.9H12v3.6h5.4c-.2 1.2-.9 2.1-1.9 2.8v2.3h3.1c1.8-1.7 2.8-4.3 2.8-7.8z" />
-                  <path d="M12 22c2.7 0 5-0.9 6.7-2.3l-3.1-2.3c-.9.6-2.1 1-3.6 1-2.8 0-5.2-1.9-6-4.6H2.7v2.9C4.4 19.9 8 22 12 22z" />
-                  <path d="M6 13.8A6.8 6.8 0 015.6 12c0-.6.1-1.1.4-1.6V7.5H3.1A10 10 0 002 12c0 1.6.4 3.1 1.1 4.5L6 13.8z" />
-                  <path d="M12 6.5c1.5 0 2.9.5 4 1.6l3-3A10 10 0 0012 2 9.8 9.8 0 006 7.5l3 1.9c.9-2.7 3.2-4.6 5.9-4.9z" />
-                </svg>
-                Google
+                {loading ? (
+                  <svg
+                    className="animate-spin h-4 w-4 text-gray-600"
+                    viewBox="0 0 24 24"
+                  >
+                    <circle
+                      className="opacity-25"
+                      cx="12"
+                      cy="12"
+                      r="10"
+                      stroke="currentColor"
+                      strokeWidth="4"
+                      fill="none"
+                    />
+                    <path
+                      className="opacity-75"
+                      fill="currentColor"
+                      d="M4 12a8 8 0 018-8v4a4 4 0 00-4 4H4z"
+                    />
+                  </svg>
+                ) : (
+                  <svg
+                    className="h-4 w-4"
+                    viewBox="0 0 24 24"
+                    fill="none"
+                    stroke="currentColor"
+                    strokeWidth="1.5"
+                  >
+                    <path d="M21 12.3c0-.7-.1-1.3-.2-1.9H12v3.6h5.4c-.2 1.2-.9 2.1-1.9 2.8v2.3h3.1c1.8-1.7 2.8-4.3 2.8-7.8z" />
+                    <path d="M12 22c2.7 0 5-0.9 6.7-2.3l-3.1-2.3c-.9.6-2.1 1-3.6 1-2.8 0-5.2-1.9-6-4.6H2.7v2.9C4.4 19.9 8 22 12 22z" />
+                    <path d="M6 13.8A6.8 6.8 0 015.6 12c0-.6.1-1.1.4-1.6V7.5H3.1A10 10 0 002 12c0 1.6.4 3.1 1.1 4.5L6 13.8z" />
+                    <path d="M12 6.5c1.5 0 2.9.5 4 1.6l3-3A10 10 0 0012 2 9.8 9.8 0 006 7.5l3 1.9c.9-2.7 3.2-4.6 5.9-4.9z" />
+                  </svg>
+                )}
+                {loading ? "Signing in..." : "Google"}
               </button>
 
               <button
