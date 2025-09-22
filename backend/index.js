@@ -9,7 +9,7 @@ const server = createServer(app);
 // This allows regular REST requests (optional)
 app.use(
   cors({
-    origin: "http://localhost:5173",
+    origin: "https://pairwise-backend.onrender.com",
     methods: ["GET", "POST"],
     credentials: true,
   })
@@ -18,7 +18,7 @@ app.use(
 // This allows Socket.IO requests
 const io = new Server(server, {
   cors: {
-    origin: "http://localhost:5173",
+    origin: "https://pairwise-backend.onrender.com",
     methods: ["GET", "POST"],
     credentials: true,
   },
@@ -37,5 +37,5 @@ io.on("connection", (socket) => {
 });
 
 server.listen(3000, () => {
-  console.log("Server running on http://localhost:3000");
+  console.log("Server running on https://pairwise-backend.onrender.com");
 });
