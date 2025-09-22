@@ -6,9 +6,6 @@ export default function Dashboard() {
   const [user, setUser] = useState<any>(null);
 
   useEffect(() => {
-    const session = supabase.auth
-      .getSession()
-      .then(({ data }) => setUser(data.session?.user));
     supabase.auth.onAuthStateChange((_event, session) =>
       setUser(session?.user)
     );
