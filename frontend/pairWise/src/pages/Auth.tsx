@@ -4,6 +4,7 @@ import { supabase } from "../lib/supabaseClient";
 export default function Auth() {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
+  const [fullName, setFullName] = useState("");
   const [isSignup, setIsSignup] = useState(false);
   const [loading, setLoading] = useState(false);
   const [showPassword, setShowPassword] = useState(false);
@@ -28,6 +29,10 @@ export default function Auth() {
     }
     if (!/^\S+@\S+\.\S+$/.test(email)) {
       setErrorMsg("Please enter a valid email address.");
+      return false;
+    }
+    if (isSignup && (!fullName || fullName.trim().length < 2)) {
+      setErrorMsg("Please enter your full name (at least 2 characters).");
       return false;
     }
     if (!password || password.length < 6) {
@@ -82,6 +87,7 @@ export default function Auth() {
         options: {
           data: {
             role: selectedRole,
+            full_name: fullName.trim(),
           },
         },
       });
@@ -221,6 +227,22 @@ export default function Auth() {
           )}
 
           <div className="space-y-4">
+            {isSignup && (
+              <label className="block">
+                <span className="text-xs text-slate-500">Full Name</span>
+                <div className="mt-1 relative">
+                  <input
+                    type="text"
+                    value={fullName}
+                    onChange={(e) => setFullName(e.target.value)}
+                    placeholder="Enter your full name"
+                    className="peer w-full rounded-lg border border-gray-200 px-4 py-2 text-sm placeholder:opacity-60 focus:outline-none focus:ring-2 focus:ring-blue-400"
+                    autoComplete="name"
+                  />
+                </div>
+              </label>
+            )}
+
             <label className="block">
               <span className="text-xs text-slate-500">Email</span>
               <div className="mt-1 relative">
