@@ -27,7 +27,7 @@ export default function Dashboard() {
       </button>
 
       <div className="mt-6">
-        <Chat />
+        <Chat user={user} />
       </div>
     </div>
   );
