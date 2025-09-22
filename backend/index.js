@@ -6,15 +6,9 @@ import { Server } from "socket.io";
 const app = express();
 const server = createServer(app);
 
-// This allows regular REST requests (optional)
-const FRONTEND_URLS = [
-  "http://localhost:5173", // local dev
-  "https://pairwise.vercel.app", // deployed frontend
-];
-
 app.use(
   cors({
-    origin: FRONTEND_URLS,
+    origin: "https://pair-wise-mvp.vercel.app", // frontend URL
     methods: ["GET", "POST"],
     credentials: true,
   })
@@ -22,7 +16,7 @@ app.use(
 
 const io = new Server(server, {
   cors: {
-    origin: FRONTEND_URLS,
+    origin: "https://pair-wise-mvp.vercel.app", // frontend URL
     methods: ["GET", "POST"],
     credentials: true,
   },
@@ -40,6 +34,5 @@ io.on("connection", (socket) => {
   });
 });
 
-server.listen(3000, () => {
-  console.log("Server running on https://pairwise-backend.onrender.com");
-});
+const PORT = process.env.PORT || 3000;
+server.listen(PORT, () => console.log(`Server running on port ${PORT}`));
