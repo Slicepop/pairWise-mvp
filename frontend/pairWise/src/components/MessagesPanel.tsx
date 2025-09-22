@@ -23,6 +23,9 @@ export default function MessagesPanel({
   const [messages, setMessages] = useState<Message[]>([]);
   const [newMessage, setNewMessage] = useState("");
   const [currentUser, setCurrentUser] = useState<any>(null);
+  const [userCache, setUserCache] = useState<
+    Map<string, { full_name: string; role: string }>
+  >(new Map());
 
   // Get current user data
   useEffect(() => {
@@ -31,9 +34,57 @@ export default function MessagesPanel({
         data: { user },
       } = await supabase.auth.getUser();
       setCurrentUser(user);
+
+      // Add current user to cache
+      if (user) {
+        setUserCache(
+          (prev) =>
+            new Map(
+              prev.set(user.id, {
+                full_name: user.user_metadata?.full_name || "You",
+                role: user.user_metadata?.role || "user",
+              })
+            )
+        );
+      }
     }
     getCurrentUser();
   }, []);
+
+  // Function to get user metadata by user_id
+  const getUserMetadata = async (userId: string) => {
+    // Check cache first
+    if (userCache.has(userId)) {
+      return userCache.get(userId)!;
+    }
+
+    // Try to fetch from profiles table (if it exists)
+    try {
+      const { data: profile, error } = await supabase
+        .from("profiles")
+        .select("full_name, role")
+        .eq("id", userId)
+        .single();
+
+      if (!error && profile) {
+        const userMetadata = {
+          full_name: profile.full_name || "Unknown User",
+          role: profile.role || "user",
+        };
+
+        // Cache the result
+        setUserCache((prev) => new Map(prev.set(userId, userMetadata)));
+        return userMetadata;
+      }
+    } catch (err) {
+      // Profiles table might not exist, that's ok
+    }
+
+    // Fallback
+    const fallbackMetadata = { full_name: "Unknown User", role: "user" };
+    setUserCache((prev) => new Map(prev.set(userId, fallbackMetadata)));
+    return fallbackMetadata;
+  };
 
   // Load existing messages
   useEffect(() => {
@@ -57,17 +108,23 @@ export default function MessagesPanel({
         return;
       }
 
-      // Create messages with available user data
-      const messagesWithUsers = messagesData.map((msg) => {
-        let userMetadata = { full_name: "Unknown", role: "user" };
+      // Create messages with user data (fetch metadata for each unique user)
+      const uniqueUserIds = [
+        ...new Set(messagesData.map((msg) => msg.user_id)),
+      ];
 
-        // If this message is from the current user, use their metadata
-        if (currentUser && msg.user_id === currentUser.id) {
-          userMetadata = {
-            full_name: currentUser.user_metadata?.full_name || "Unknown",
-            role: currentUser.user_metadata?.role || "user",
-          };
-        }
+      // Fetch metadata for all unique users
+      const userMetadataPromises = uniqueUserIds.map((userId) =>
+        getUserMetadata(userId)
+      );
+      await Promise.all(userMetadataPromises);
+
+      // Now map messages with the cached user data
+      const messagesWithUsers = messagesData.map((msg) => {
+        const userMetadata = userCache.get(msg.user_id) || {
+          full_name: "Unknown User",
+          role: "user",
+        };
 
         return {
           id: msg.id,
@@ -82,7 +139,7 @@ export default function MessagesPanel({
     }
 
     loadMessages();
-  }, [threadId, currentUser]);
+  }, [threadId, currentUser, userCache]);
 
   // Subscribe to new messages
   useEffect(() => {
@@ -99,16 +156,8 @@ export default function MessagesPanel({
           filter: `thread_id=eq.${threadId}`,
         },
         async (payload) => {
-          // When a new message arrives, we need to determine the user metadata
-          let userMetadata = { full_name: "Unknown", role: "user" };
-
-          // If it's from the current user, use their metadata
-          if (currentUser && payload.new.user_id === currentUser.id) {
-            userMetadata = {
-              full_name: currentUser.user_metadata?.full_name || "Unknown",
-              role: currentUser.user_metadata?.role || "user",
-            };
-          }
+          // Get user metadata for the message sender
+          const userMetadata = await getUserMetadata(payload.new.user_id);
 
           const newMsg = {
             id: payload.new.id,
