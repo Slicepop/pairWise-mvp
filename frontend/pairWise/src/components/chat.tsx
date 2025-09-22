@@ -1,7 +1,7 @@
 import { useEffect, useState } from "react";
 import { io } from "socket.io-client";
 
-const socket = io("https://pairwise-backend.onrender.com"); // backend port
+const socket = io("https://pairwise-mvp.onrender.com"); // backend port
 
 export default function Chat() {
   const [message, setMessage] = useState("");
