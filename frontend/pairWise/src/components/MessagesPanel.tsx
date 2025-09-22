@@ -12,6 +12,7 @@ interface Message {
   id: string;
   content: string;
   created_at: string;
+  user_id: string;
   user_metadata: { full_name?: string; role?: string };
 }
 
@@ -21,40 +22,67 @@ export default function MessagesPanel({
 }: MessagesPanelProps) {
   const [messages, setMessages] = useState<Message[]>([]);
   const [newMessage, setNewMessage] = useState("");
+  const [currentUser, setCurrentUser] = useState<any>(null);
+
+  // Get current user data
+  useEffect(() => {
+    async function getCurrentUser() {
+      const {
+        data: { user },
+      } = await supabase.auth.getUser();
+      setCurrentUser(user);
+    }
+    getCurrentUser();
+  }, []);
 
   // Load existing messages
   useEffect(() => {
     async function loadMessages() {
-      const { data, error } = await supabase
+      if (!threadId || !currentUser) return;
+
+      // First, fetch messages
+      const { data: messagesData, error: messagesError } = await supabase
         .from("messages")
-        .select(
-          `
-          id, content, created_at, 
-          user:user_id ( user_metadata )
-        `
-        )
+        .select("id, content, created_at, user_id")
         .eq("thread_id", threadId)
         .order("created_at", { ascending: true });
 
-      if (!error && data) {
-        setMessages(
-          data.map((d: any) => ({
-            id: d.id,
-            content: d.content,
-            created_at: d.created_at,
-            user_metadata: d.user?.user_metadata || {
-              full_name: "Unknown",
-              role: "user",
-            },
-          }))
-        );
-      } else {
-        console.error(error);
+      if (messagesError) {
+        console.error("Error loading messages:", messagesError);
+        return;
       }
+
+      if (!messagesData || messagesData.length === 0) {
+        setMessages([]);
+        return;
+      }
+
+      // Create messages with available user data
+      const messagesWithUsers = messagesData.map((msg) => {
+        let userMetadata = { full_name: "Unknown", role: "user" };
+
+        // If this message is from the current user, use their metadata
+        if (currentUser && msg.user_id === currentUser.id) {
+          userMetadata = {
+            full_name: currentUser.user_metadata?.full_name || "Unknown",
+            role: currentUser.user_metadata?.role || "user",
+          };
+        }
+
+        return {
+          id: msg.id,
+          content: msg.content,
+          created_at: msg.created_at,
+          user_id: msg.user_id,
+          user_metadata: userMetadata,
+        };
+      });
+
+      setMessages(messagesWithUsers);
     }
 
-    if (threadId) loadMessages();
-  }, [threadId]);
+    loadMessages();
+  }, [threadId, currentUser]);
 
   // Subscribe to new messages
   useEffect(() => {
@@ -70,14 +98,45 @@ export default function MessagesPanel({
           table: "messages",
           filter: `thread_id=eq.${threadId}`,
         },
-        (payload) => {
+        async (payload) => {
+          // When a new message arrives, we need to determine the user metadata
+          let userMetadata = { full_name: "Unknown", role: "user" };
+
+          // If it's from the current user, use their metadata
+          if (currentUser && payload.new.user_id === currentUser.id) {
+            userMetadata = {
+              full_name: currentUser.user_metadata?.full_name || "Unknown",
+              role: currentUser.user_metadata?.role || "user",
+            };
+          }
+
           const newMsg = {
             id: payload.new.id,
             content: payload.new.content,
             created_at: payload.new.created_at,
-            user_metadata: payload.new.user_metadata,
+            user_id: payload.new.user_id,
+            user_metadata: userMetadata,
           };
-          setMessages((prev) => [...prev, newMsg]);
+
+          // Check if message already exists (to avoid duplicates from optimistic updates)
+          setMessages((prev) => {
+            const exists = prev.some(
+              (msg) =>
+                msg.id === newMsg.id ||
+                (msg.content === newMsg.content &&
+                  msg.user_id === newMsg.user_id &&
+                  Math.abs(
+                    new Date(msg.created_at).getTime() -
+                      new Date(newMsg.created_at).getTime()
+                  ) < 1000)
+            );
+
+            if (exists) {
+              return prev;
+            }
+
+            return [...prev, newMsg];
+          });
         }
       )
       .subscribe();
@@ -85,22 +144,63 @@ export default function MessagesPanel({
     return () => {
       supabase.removeChannel(channel);
     };
-  }, [threadId]);
+  }, [threadId, currentUser]);
 
   // Send new message
   async function sendMessage() {
-    if (!newMessage.trim()) return;
+    if (!newMessage.trim() || !currentUser) return;
 
-    const { error } = await supabase.from("messages").insert([
-      {
-        thread_id: threadId,
-        user_id: currentUserId,
-        content: newMessage,
+    const messageContent = newMessage.trim();
+    const tempId = `temp-${Date.now()}`;
+
+    // Optimistic update - immediately add message to UI
+    const optimisticMessage = {
+      id: tempId,
+      content: messageContent,
+      created_at: new Date().toISOString(),
+      user_id: currentUserId,
+      user_metadata: {
+        full_name: currentUser.user_metadata?.full_name || "You",
+        role: currentUser.user_metadata?.role || "user",
       },
-    ]);
+    };
 
-    if (error) console.error(error);
-    else setNewMessage("");
+    setMessages((prev) => [...prev, optimisticMessage]);
+    setNewMessage(""); // Clear input immediately
+
+    // Send to database
+    const { data, error } = await supabase
+      .from("messages")
+      .insert([
+        {
+          thread_id: threadId,
+          user_id: currentUserId,
+          content: messageContent,
+        },
+      ])
+      .select()
+      .single();
+
+    if (error) {
+      console.error("Error sending message:", error);
+      // Remove optimistic message on error
+      setMessages((prev) => prev.filter((msg) => msg.id !== tempId));
+      // Restore message in input
+      setNewMessage(messageContent);
+    } else {
+      // Replace optimistic message with real one from database
+      setMessages((prev) =>
+        prev.map((msg) =>
+          msg.id === tempId
+            ? {
+                ...msg,
+                id: data.id,
+                created_at: data.created_at,
+              }
+            : msg
+        )
+      );
+    }
   }
 
   return (
