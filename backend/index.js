@@ -7,18 +7,22 @@ const app = express();
 const server = createServer(app);
 
 // This allows regular REST requests (optional)
+const FRONTEND_URLS = [
+  "http://localhost:5173", // local dev
+  "https://pairwise.vercel.app", // deployed frontend
+];
+
 app.use(
   cors({
-    origin: "https://pairwise-backend.onrender.com",
+    origin: FRONTEND_URLS,
     methods: ["GET", "POST"],
     credentials: true,
   })
 );
 
-// This allows Socket.IO requests
 const io = new Server(server, {
   cors: {
-    origin: "https://pairwise-backend.onrender.com",
+    origin: FRONTEND_URLS,
     methods: ["GET", "POST"],
     credentials: true,
   },
