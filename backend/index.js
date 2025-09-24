@@ -8,15 +8,19 @@ const server = createServer(app);
 
 app.use(
   cors({
-    origin: "https://pair-wise-mvp.vercel.app", // frontend URL
+    origin: "https://pair-wise-mvp.vercel.app",
     methods: ["GET", "POST"],
     credentials: true,
   })
 );
 
+// Optional root route for testing
+app.get("/", (req, res) => res.send("Socket.IO server running!"));
+
 const io = new Server(server, {
+  path: "/socket.io",
   cors: {
-    origin: "https://pair-wise-mvp.vercel.app", // frontend URL
+    origin: "https://pair-wise-mvp.vercel.app",
     methods: ["GET", "POST"],
     credentials: true,
   },
@@ -30,14 +34,11 @@ io.on("connection", (socket) => {
   });
 
   socket.on("editor-change", ({ threadId, content }) => {
-    // Broadcast to everyone else in the same thread
     socket.to(threadId).emit("editor-update", content);
   });
 
-  socket.on("disconnect", () => {
-    console.log("User disconnected:", socket.id);
-  });
+  socket.on("disconnect", () => console.log("User disconnected:", socket.id));
 });
 
-const PORT = process.env.PORT || 3000;
+const PORT = process.env.PORT || 10000;
 server.listen(PORT, () => console.log(`Server running on port ${PORT}`));

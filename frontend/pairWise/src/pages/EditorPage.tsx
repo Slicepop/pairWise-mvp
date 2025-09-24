@@ -53,12 +53,15 @@ export default function EditorPage() {
   useEffect(() => {
     if (!post) return;
 
-    socketRef.current = io("https://your-backend.onrender.com"); // Replace with your Render URL
+    socketRef.current = io("https://pairwise-mvp.onrender.com", {
+      path: "/socket.io",
+      transports: ["websocket"], // force websocket to avoid polling issues
+    });
 
-    // Join thread room
+    // Join a thread room
     socketRef.current.emit("join-thread", post.thread_id);
 
-    // Listen for editor updates from others
+    // Listen for updates from other users
     socketRef.current.on("editor-update", (newCode: string) => {
       setCode(newCode);
     });
