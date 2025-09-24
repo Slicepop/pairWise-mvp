@@ -5,9 +5,39 @@ interface PostsPanelProps {
   currentUserId: string;
 }
 
+interface Profile {
+  id: string;
+  full_name: string;
+  role: string;
+}
+
+interface Reply {
+  id: string | number;
+  content: string;
+  created_at: string;
+  profiles: Profile;
+}
+
+interface Post {
+  id: string | number;
+  subject: string;
+  content: string;
+  request_help: boolean;
+  created_at: string;
+  user_id: string;
+  profiles: Profile;
+  replies?: Reply[];
+}
+
+interface NewPost {
+  subject: string;
+  content: string;
+  request_help: boolean;
+}
+
 export default function PostsPanel({ currentUserId }: PostsPanelProps) {
-  const [posts, setPosts] = useState([]);
-  const [newPost, setNewPost] = useState({
+  const [posts, setPosts] = useState<Post[]>([]);
+  const [newPost, setNewPost] = useState<NewPost>({
     subject: "",
     content: "",
     request_help: false,
@@ -27,13 +57,19 @@ export default function PostsPanel({ currentUserId }: PostsPanelProps) {
           request_help,
           created_at,
           user_id,
-          profiles(id, full_name, role)
+          profiles!inner(id, full_name, role),
+          replies(
+            id,
+            content,
+            created_at,
+            profiles!inner(id, full_name, role)
+          )
         `
         )
         .order("created_at", { ascending: true });
 
       if (error) return console.error(error);
-      setPosts(data || []);
+      setPosts((data as any) || []);
     }
     loadPosts();
   }, []);
@@ -47,8 +83,40 @@ export default function PostsPanel({ currentUserId }: PostsPanelProps) {
         ...newPost,
       },
     ]);
-    if (error) console.error(error);
-    else setNewPost({ subject: "", content: "", request_help: false });
+    if (error) {
+      console.error(error);
+    } else {
+      setNewPost({ subject: "", content: "", request_help: false });
+      // Reload posts to show the new one
+      loadPostsAgain();
+    }
+  }
+
+  // Helper function to reload posts
+  async function loadPostsAgain() {
+    const { data, error } = await supabase
+      .from("posts")
+      .select(
+        `
+        id,
+        subject,
+        content,
+        request_help,
+        created_at,
+        user_id,
+        profiles!inner(id, full_name, role),
+        replies(
+          id,
+          content,
+          created_at,
+          profiles!inner(id, full_name, role)
+        )
+      `
+      )
+      .order("created_at", { ascending: true });
+
+    if (error) return console.error(error);
+    setPosts((data as any) || []);
   }
 
   // Send reply
@@ -63,8 +131,13 @@ export default function PostsPanel({ currentUserId }: PostsPanelProps) {
         content,
       },
     ]);
-    if (error) console.error(error);
-    else setReplyText((prev) => ({ ...prev, [postId]: "" }));
+    if (error) {
+      console.error(error);
+    } else {
+      setReplyText((prev) => ({ ...prev, [postId]: "" }));
+      // Reload posts to show the new reply
+      loadPostsAgain();
+    }
   }
 
   return (
