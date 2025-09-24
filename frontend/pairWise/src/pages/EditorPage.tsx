@@ -1,8 +1,7 @@
 import { useParams } from "react-router";
-import { useEffect, useState, useRef } from "react";
+import { useEffect, useState, useCallback, useRef } from "react";
 import Editor from "@monaco-editor/react";
 import { supabase } from "../lib/supabaseClient";
-import { io, Socket } from "socket.io-client";
 
 interface Post {
   id: string | number;
@@ -20,9 +19,12 @@ export default function EditorPage() {
   const [post, setPost] = useState<Post | null>(null);
   const [loading, setLoading] = useState(true);
   const [code, setCode] = useState("");
-  const socketRef = useRef<Socket | null>(null);
 
-  // Load post from Supabase
+  // Debouncing for database updates
+  const debounceTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+  const isUpdatingFromRemoteRef = useRef(false);
+
+  // Load post and initialize code
   useEffect(() => {
     async function loadPost() {
       if (!postID) return;
@@ -39,9 +41,40 @@ export default function EditorPage() {
         console.error("Error loading post:", error);
       } else {
         setPost(data as any);
-        setCode(
-          `// Coding Session: ${data.subject}\n// Help requested: ${data.content}\n\nfunction solution() {\n  console.log('Let's solve this together!');\n}`
-        );
+
+        const initialCode = `// Coding Session: ${data.subject}\n// Help requested: ${data.content}\n\nfunction solution() {\n  console.log('Let\\'s solve this together!');\n}`;
+        setCode(initialCode);
+
+        // Check if editor content already exists, if not create it
+        const { data: existingEditor } = await supabase
+          .from("editor_changes")
+          .select("content")
+          .eq("post_id", data.id)
+          .single();
+
+        if (existingEditor) {
+          // Use existing code from database
+          setCode(existingEditor.content);
+        } else {
+          // Initialize with default code using upsert to prevent duplicates
+          const { error: upsertError } = await supabase
+            .from("editor_changes")
+            .upsert(
+              {
+                post_id: data.id,
+                content: initialCode,
+                updated_at: new Date().toISOString(),
+              },
+              {
+                onConflict: "post_id",
+                ignoreDuplicates: false,
+              }
+            );
+
+          if (upsertError) {
+            console.error("Error initializing editor:", upsertError);
+          }
+        }
       }
       setLoading(false);
     }
@@ -49,38 +82,98 @@ export default function EditorPage() {
     loadPost();
   }, [postID]);
 
-  // Setup Socket.IO
+  // Subscribe to realtime changes
   useEffect(() => {
     if (!post) return;
 
-    socketRef.current = io("https://pairwise-mvp.onrender.com", {
-      path: "/socket.io",
-      transports: ["websocket"], // force websocket to avoid polling issues
-    });
+    console.log("Setting up real-time listener for post:", post.id);
 
-    // Join a thread room
-    socketRef.current.emit("join-thread", post.thread_id);
-
-    // Listen for updates from other users
-    socketRef.current.on("editor-update", (newCode: string) => {
-      setCode(newCode);
-    });
+    const channel = supabase
+      .channel(`editor_changes_${post.id}`)
+      .on(
+        "postgres_changes",
+        {
+          event: "UPDATE",
+          schema: "public",
+          table: "editor_changes",
+          filter: `post_id=eq.${post.id}`,
+        },
+        (payload) => {
+          console.log("Received real-time update:", payload);
+          // Set flag to prevent triggering database update from this change
+          isUpdatingFromRemoteRef.current = true;
+          // Update editor when other users make changes
+          setCode(payload.new.content);
+        }
+      )
+      .subscribe();
 
     return () => {
-      socketRef.current?.disconnect();
+      supabase.removeChannel(channel);
     };
   }, [post]);
 
-  const handleEditorChange = (value: string | undefined) => {
-    if (!value || !socketRef.current || !post) return;
+  // Cleanup timeout on unmount
+  useEffect(() => {
+    return () => {
+      if (debounceTimeoutRef.current) {
+        clearTimeout(debounceTimeoutRef.current);
+      }
+    };
+  }, []);
 
+  // Debounced database update function
+  const updateDatabase = useCallback(
+    async (value: string, postId: string | number) => {
+      console.log(
+        "Updating database for post:",
+        postId,
+        "with length:",
+        value.length
+      );
+
+      const { error } = await supabase.from("editor_changes").upsert(
+        {
+          post_id: postId,
+          content: value,
+          updated_at: new Date().toISOString(),
+        },
+        {
+          onConflict: "post_id",
+        }
+      );
+
+      if (error) {
+        console.error("Error updating editor content:", error);
+      } else {
+        console.log("Successfully updated editor content");
+      }
+    },
+    []
+  );
+
+  // Handle editor changes with debouncing
+  const handleEditorChange = (value: string | undefined) => {
+    if (!value || !post) return;
+
+    // Don't update if this change came from a remote update
+    if (isUpdatingFromRemoteRef.current) {
+      isUpdatingFromRemoteRef.current = false;
+      return;
+    }
+
+    // Update local state immediately for responsive UI
     setCode(value);
 
-    // Emit changes to server
-    socketRef.current.emit("editor-change", {
-      threadId: post.thread_id,
-      content: value,
-    });
+    // Clear existing timeout
+    if (debounceTimeoutRef.current) {
+      clearTimeout(debounceTimeoutRef.current);
+    }
+
+    // Set new timeout for database update (debounce for 500ms)
+    debounceTimeoutRef.current = setTimeout(() => {
+      updateDatabase(value, post.id);
+    }, 500);
   };
 
   if (loading) {
