@@ -95,9 +95,7 @@ export default function Auth() {
       if (error) {
         setErrorMsg(error.message);
       } else {
-        setSuccessMsg(
-          "Sign-up successful — check your email for a confirmation link."
-        );
+        setSuccessMsg("Sign-up successful ");
         setShowRoleModal(false);
         setSelectedRole(null);
       }

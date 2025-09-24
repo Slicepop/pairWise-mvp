@@ -1,10 +1,8 @@
-"use client";
-
 import { useEffect, useState } from "react";
 import { supabase } from "../lib/supabaseClient";
 
 interface Thread {
-  id: string;
+  threadID: string;
   name: string;
 }
 
@@ -21,7 +19,7 @@ export default function threads({ onSelect }: ThreadsSidebarProps) {
     async function loadThreads() {
       const { data, error } = await supabase
         .from("threads")
-        .select("id, name")
+        .select("threadID, name")
         .order("name", { ascending: true });
       if (!error && data) setThreads(data);
       console.log(data, error);
@@ -35,7 +33,7 @@ export default function threads({ onSelect }: ThreadsSidebarProps) {
       <ul>
         {threads.map((t) => (
           <li
-            key={t.id}
+            key={t.threadID}
             onClick={() => onSelect(t)}
             className="p-2 hover:bg-gray-700 cursor-pointer rounded"
           >

@@ -1,285 +1,320 @@
-"use client";
-
 import { useEffect, useState } from "react";
 import { supabase } from "../lib/supabaseClient";
 
-interface MessagesPanelProps {
-  threadId: string;
+interface PostsPanelProps {
   currentUserId: string;
+  threadId: string;
 }
 
-interface Message {
+interface Profile {
   id: string;
+  full_name: string;
+  role: string;
+}
+
+interface Reply {
+  id: string | number;
   content: string;
   created_at: string;
-  user_id: string;
-  user_metadata: { full_name?: string; role?: string };
+  profiles: Profile;
 }
 
-export default function MessagesPanel({
-  threadId,
+interface Post {
+  id: string | number;
+  subject: string;
+  content: string;
+  request_help: boolean;
+  created_at: string;
+  user_id: string;
+  thread_id: string;
+  profiles: Profile;
+  replies?: Reply[];
+}
+
+interface NewPost {
+  subject: string;
+  content: string;
+  request_help: boolean;
+}
+
+export default function PostsPanel({
   currentUserId,
-}: MessagesPanelProps) {
-  const [messages, setMessages] = useState<Message[]>([]);
-  const [newMessage, setNewMessage] = useState("");
-  const [currentUser, setCurrentUser] = useState<any>(null);
-  const [userCache, setUserCache] = useState<
-    Map<string, { full_name: string; role: string }>
-  >(new Map());
+  threadId,
+}: PostsPanelProps) {
+  const [newPost, setNewPost] = useState<NewPost>({
+    subject: "",
+    content: "",
+    request_help: false,
+  });
 
-  // Get current user data
+  const [posts, setPosts] = useState<Post[]>([]);
+  const [replyText, setReplyText] = useState<Record<string | number, string>>(
+    {}
+  );
+
+  // Load posts with author profiles and replies
   useEffect(() => {
-    async function getCurrentUser() {
-      const {
-        data: { user },
-      } = await supabase.auth.getUser();
-      setCurrentUser(user);
-
-      // Add current user to cache
-      if (user) {
-        setUserCache(
-          (prev) =>
-            new Map(
-              prev.set(user.id, {
-                full_name: user.user_metadata?.full_name || "You",
-                role: user.user_metadata?.role || "user",
-              })
-            )
-        );
-      }
-    }
-    getCurrentUser();
-  }, []);
-
-  // Function to get user metadata by user_id
-  const getUserMetadata = async (userId: string) => {
-    // Check cache first
-    if (userCache.has(userId)) {
-      return userCache.get(userId)!;
-    }
-
-    // Try to fetch from profiles table (if it exists)
-    try {
-      const { data: profile, error } = await supabase
-        .from("profiles")
-        .select("full_name, role")
-        .eq("id", userId)
-        .single();
-
-      if (!error && profile) {
-        const userMetadata = {
-          full_name: profile.full_name || "Unknown User",
-          role: profile.role || "user",
-        };
-
-        // Cache the result
-        setUserCache((prev) => new Map(prev.set(userId, userMetadata)));
-        return userMetadata;
-      }
-    } catch (err) {
-      // Profiles table might not exist, that's ok
-    }
-
-    // Fallback
-    const fallbackMetadata = { full_name: "Unknown User", role: "user" };
-    setUserCache((prev) => new Map(prev.set(userId, fallbackMetadata)));
-    return fallbackMetadata;
-  };
-
-  // Load existing messages
-  useEffect(() => {
-    async function loadMessages() {
-      if (!threadId || !currentUser) return;
-
-      // First, fetch messages
-      const { data: messagesData, error: messagesError } = await supabase
-        .from("messages")
-        .select("id, content, created_at, user_id")
+    async function loadPosts() {
+      const { data, error } = await supabase
+        .from("posts")
+        .select(
+          `
+          id,
+          subject,
+          content,
+          request_help,
+          created_at,
+          user_id,
+          thread_id,
+          profiles!inner(id, full_name, role),
+          replies(
+            id,
+            content,
+            created_at,
+            profiles!inner(id, full_name, role)
+          )
+        `
+        )
         .eq("thread_id", threadId)
-        .order("created_at", { ascending: true });
+        .order("created_at", { ascending: false });
 
-      if (messagesError) {
-        console.error("Error loading messages:", messagesError);
+      if (error) {
+        console.error("Error loading posts:", error);
         return;
       }
-
-      if (!messagesData || messagesData.length === 0) {
-        setMessages([]);
-        return;
-      }
-
-      // Create messages with user data (fetch metadata for each unique user)
-      const uniqueUserIds = [
-        ...new Set(messagesData.map((msg) => msg.user_id)),
-      ];
-
-      // Fetch metadata for all unique users
-      const userMetadataPromises = uniqueUserIds.map((userId) =>
-        getUserMetadata(userId)
-      );
-      await Promise.all(userMetadataPromises);
-
-      // Now map messages with the cached user data
-      const messagesWithUsers = messagesData.map((msg) => {
-        const userMetadata = userCache.get(msg.user_id) || {
-          full_name: "Unknown User",
-          role: "user",
-        };
-
-        return {
-          id: msg.id,
-          content: msg.content,
-          created_at: msg.created_at,
-          user_id: msg.user_id,
-          user_metadata: userMetadata,
-        };
-      });
-
-      setMessages(messagesWithUsers);
+      setPosts((data as any) || []);
     }
 
-    loadMessages();
-  }, [threadId, currentUser, userCache]);
+    loadPosts();
 
-  // Subscribe to new messages
-  useEffect(() => {
-    if (!threadId) return;
-
-    const channel = supabase
-      .channel(`messages-thread-${threadId}`)
+    // Subscribe to new posts
+    const postsChannel = supabase
+      .channel("posts_changes")
       .on(
         "postgres_changes",
         {
           event: "INSERT",
           schema: "public",
-          table: "messages",
-          filter: `thread_id=eq.${threadId}`,
+          table: "posts",
         },
         async (payload) => {
-          // Get user metadata for the message sender
-          const userMetadata = await getUserMetadata(payload.new.user_id);
+          console.log("New post received:", payload);
+          // Only add posts for the current thread
+          if (payload.new.thread_id !== threadId) return;
 
-          const newMsg = {
-            id: payload.new.id,
-            content: payload.new.content,
-            created_at: payload.new.created_at,
-            user_id: payload.new.user_id,
-            user_metadata: userMetadata,
-          };
+          // Fetch the complete post with profile data
+          const { data, error } = await supabase
+            .from("posts")
+            .select(
+              `
+              id,
+              subject,
+              content,
+              request_help,
+              created_at,
+              user_id,
+              thread_id,
+              profiles!inner(id, full_name, role)
+            `
+            )
+            .eq("id", payload.new.id)
+            .single();
 
-          // Check if message already exists (to avoid duplicates from optimistic updates)
-          setMessages((prev) => {
-            const exists = prev.some(
-              (msg) =>
-                msg.id === newMsg.id ||
-                (msg.content === newMsg.content &&
-                  msg.user_id === newMsg.user_id &&
-                  Math.abs(
-                    new Date(msg.created_at).getTime() -
-                      new Date(newMsg.created_at).getTime()
-                  ) < 1000)
-            );
-
-            if (exists) {
-              return prev;
-            }
-
-            return [...prev, newMsg];
-          });
+          if (!error && data) {
+            setPosts((prev) => [{ ...(data as any), replies: [] }, ...prev]);
+          }
         }
       )
       .subscribe();
 
-    return () => {
-      supabase.removeChannel(channel);
-    };
-  }, [threadId, currentUser]);
-
-  // Send new message
-  async function sendMessage() {
-    if (!newMessage.trim() || !currentUser) return;
-
-    const messageContent = newMessage.trim();
-    const tempId = `temp-${Date.now()}`;
-
-    // Optimistic update - immediately add message to UI
-    const optimisticMessage = {
-      id: tempId,
-      content: messageContent,
-      created_at: new Date().toISOString(),
-      user_id: currentUserId,
-      user_metadata: {
-        full_name: currentUser.user_metadata?.full_name || "You",
-        role: currentUser.user_metadata?.role || "user",
-      },
-    };
-
-    setMessages((prev) => [...prev, optimisticMessage]);
-    setNewMessage(""); // Clear input immediately
-
-    // Send to database
-    const { data, error } = await supabase
-      .from("messages")
-      .insert([
+    // Subscribe to new replies
+    const repliesChannel = supabase
+      .channel("replies_changes")
+      .on(
+        "postgres_changes",
         {
-          thread_id: threadId,
-          user_id: currentUserId,
-          content: messageContent,
+          event: "INSERT",
+          schema: "public",
+          table: "replies",
         },
-      ])
-      .select()
-      .single();
+        async (payload) => {
+          console.log("New reply received:", payload);
+          // Fetch the complete reply with profile data
+          const { data, error } = await supabase
+            .from("replies")
+            .select(
+              `
+              id,
+              content,
+              created_at,
+              post_id,
+              profiles!inner(id, full_name, role)
+            `
+            )
+            .eq("id", payload.new.id)
+            .single();
+
+          if (!error && data) {
+            setPosts((prev) =>
+              prev.map((post) =>
+                post.id === data.post_id
+                  ? { ...post, replies: [...(post.replies || []), data as any] }
+                  : post
+              )
+            );
+          }
+        }
+      )
+      .subscribe();
+
+    // Cleanup subscriptions
+    return () => {
+      supabase.removeChannel(postsChannel);
+      supabase.removeChannel(repliesChannel);
+    };
+  }, [threadId]); // Re-run when threadId changes
+
+  // Send new post
+  async function sendPost() {
+    if (!newPost.subject.trim() && !newPost.content.trim()) return;
+
+    const { error } = await supabase.from("posts").insert([
+      {
+        user_id: currentUserId,
+        thread_id: threadId,
+        ...newPost,
+      },
+    ]);
 
     if (error) {
-      console.error("Error sending message:", error);
-      // Remove optimistic message on error
-      setMessages((prev) => prev.filter((msg) => msg.id !== tempId));
-      // Restore message in input
-      setNewMessage(messageContent);
+      console.error("Error creating post:", error);
     } else {
-      // Replace optimistic message with real one from database
-      setMessages((prev) =>
-        prev.map((msg) =>
-          msg.id === tempId
-            ? {
-                ...msg,
-                id: data.id,
-                created_at: data.created_at,
-              }
-            : msg
-        )
-      );
+      setNewPost({ subject: "", content: "", request_help: false });
+      // Real-time subscription will handle adding the post to the UI
+    }
+  }
+
+  // Send reply
+  async function sendReply(postId: string | number) {
+    const content = replyText[postId];
+    if (!content?.trim()) return;
+
+    const { error } = await supabase.from("replies").insert([
+      {
+        post_id: postId,
+        user_id: currentUserId,
+        content,
+      },
+    ]);
+
+    if (error) {
+      console.error("Error creating reply:", error);
+    } else {
+      setReplyText((prev) => ({ ...prev, [postId]: "" }));
+      // Real-time subscription will handle adding the reply to the UI
     }
   }
 
   return (
-    <div className="flex flex-col h-full border-l border-gray-300">
-      <div className="flex-1 overflow-y-auto p-4 space-y-2">
-        {messages.map((msg) => (
-          <div key={msg.id} className="p-2 rounded bg-gray-100">
-            <span className="font-bold">
-              {msg.user_metadata.full_name} ({msg.user_metadata.role}):{" "}
-            </span>
-            {msg.content}
-          </div>
-        ))}
+    <div className="relative h-full">
+      {/* Posts Section - Scrollable with bottom padding to avoid form overlap */}
+      <div
+        className="absolute inset-0 overflow-y-auto"
+        style={{ paddingBottom: "200px" }}
+      >
+        <div className="p-4 space-y-4">
+          {posts.map((post) => (
+            <div
+              key={post.id}
+              className="p-4 border rounded space-y-2 bg-white"
+            >
+              <div className="flex justify-between items-center">
+                <span className="font-bold">
+                  {post.profiles.full_name} ({post.profiles.role})
+                </span>
+                {post.request_help && (
+                  <span className="text-red-500 font-semibold">
+                    Help Requested
+                  </span>
+                )}
+              </div>
+              <h3 className="font-semibold">{post.subject}</h3>
+              <p>{post.content}</p>
+
+              {/* Replies */}
+              <div className="pl-4 mt-2 border-l space-y-2">
+                {post.replies?.map((reply) => (
+                  <div key={reply.id} className="p-2 rounded bg-gray-100">
+                    <span className="font-bold">
+                      {reply.profiles.full_name}:
+                    </span>{" "}
+                    {reply.content}
+                  </div>
+                ))}
+
+                {/* Reply Input */}
+                <div className="flex mt-2">
+                  <input
+                    type="text"
+                    className="flex-1 border rounded p-2 mr-2"
+                    placeholder="Write a reply..."
+                    value={replyText[post.id] || ""}
+                    onChange={(e) =>
+                      setReplyText((prev) => ({
+                        ...prev,
+                        [post.id]: e.target.value,
+                      }))
+                    }
+                    onKeyDown={(e) => e.key === "Enter" && sendReply(post.id)}
+                  />
+                  <button
+                    onClick={() => sendReply(post.id)}
+                    className="bg-blue-500 text-white px-4 py-2 rounded"
+                  >
+                    Reply
+                  </button>
+                </div>
+              </div>
+            </div>
+          ))}
+        </div>
       </div>
 
-      <div className="p-4 border-t border-gray-300 flex">
+      {/* Absolutely Positioned Form - Always at Bottom */}
+      <div className="absolute bottom-0 left-0 right-0 border-t bg-white p-4 shadow-lg">
         <input
           type="text"
-          className="flex-1 border rounded p-2 mr-2"
-          placeholder="Type a message..."
-          value={newMessage}
-          onChange={(e) => setNewMessage(e.target.value)}
-          onKeyDown={(e) => e.key === "Enter" && sendMessage()}
+          placeholder="Subject"
+          className="w-full border p-2 rounded mb-2"
+          value={newPost.subject}
+          onChange={(e) => setNewPost({ ...newPost, subject: e.target.value })}
         />
-        <button
-          onClick={sendMessage}
-          className="bg-blue-500 text-white px-4 py-2 rounded"
-        >
-          Send
-        </button>
+        <textarea
+          placeholder="Content"
+          className="w-full border p-2 rounded mb-2 resize-none"
+          rows={3}
+          value={newPost.content}
+          onChange={(e) => setNewPost({ ...newPost, content: e.target.value })}
+        />
+        <div className="flex items-center justify-between">
+          <label className="flex items-center">
+            <input
+              type="checkbox"
+              checked={newPost.request_help}
+              onChange={(e) =>
+                setNewPost({ ...newPost, request_help: e.target.checked })
+              }
+              className="mr-2"
+            />
+            Request Help
+          </label>
+          <button
+            onClick={sendPost}
+            className="bg-blue-500 text-white px-4 py-2 rounded hover:bg-blue-600"
+          >
+            Post
+          </button>
+        </div>
       </div>
     </div>
   );

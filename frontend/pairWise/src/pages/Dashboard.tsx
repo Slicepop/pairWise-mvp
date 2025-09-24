@@ -1,7 +1,7 @@
 import { useEffect, useState } from "react";
 import { supabase } from "../lib/supabaseClient";
 import Threads from "../components/threads";
-import MessagesPanel from "../components/MessagesPanel";
+import PostsPanel from "../components/MessagesPanel";
 import type { Thread } from "../components/threads";
 
 export default function Dashboard() {
@@ -162,12 +162,9 @@ export default function Dashboard() {
           </div>
         </header>
 
-        {/* Main Content Area */}
         <div className="flex flex-1 overflow-hidden">
-          {/* Sidebar on the left */}
           <Threads onSelect={(t) => setActiveThread(t)} />
 
-          {/* Main chat area */}
           <main className="flex-1 p-4">
             {activeThread ? (
               <div className="flex flex-col h-full">
@@ -175,9 +172,9 @@ export default function Dashboard() {
                   {activeThread.name} Thread
                 </h1>
                 <div className="flex-1">
-                  <MessagesPanel
-                    threadId={activeThread.id}
+                  <PostsPanel
                     currentUserId={user.id}
+                    threadId={activeThread.threadID}
                   />
                 </div>
               </div>

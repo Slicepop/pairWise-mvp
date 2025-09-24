@@ -1,76 +1,156 @@
 import { useEffect, useState } from "react";
-import { io } from "socket.io-client";
+import { supabase } from "../lib/supabaseClient";
 
-interface ChatProps {
-  user: any;
+interface PostsPanelProps {
+  currentUserId: string;
 }
 
-interface Message {
-  message: string;
-  email: string;
-  username?: string;
-  fullName?: string;
-}
+export default function PostsPanel({ currentUserId }: PostsPanelProps) {
+  const [posts, setPosts] = useState([]);
+  const [newPost, setNewPost] = useState({
+    subject: "",
+    content: "",
+    request_help: false,
+  });
+  const [replyText, setReplyText] = useState<Record<string, string>>({}); // postId -> text
 
-const socket = io("https://pairwise-mvp.onrender.com");
-
-export default function Chat({ user }: ChatProps) {
-  const [message, setMessage] = useState("");
-  const [messages, setMessages] = useState<Message[]>([]);
-
+  // Load posts with author profiles
   useEffect(() => {
-    socket.on("chat message", (msg: Message) => {
-      setMessages((prev) => [...prev, msg]);
-    });
+    async function loadPosts() {
+      const { data, error } = await supabase
+        .from("posts")
+        .select(
+          `
+          id,
+          subject,
+          content,
+          request_help,
+          created_at,
+          user_id,
+          profiles(id, full_name, role)
+        `
+        )
+        .order("created_at", { ascending: true });
 
-    return () => {
-      socket.off("chat message");
-    };
+      if (error) return console.error(error);
+      setPosts(data || []);
+    }
+    loadPosts();
   }, []);
 
-  const handleSubmit = (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!message.trim()) return;
+  // Send new post
+  async function sendPost() {
+    if (!newPost.subject.trim() && !newPost.content.trim()) return;
+    const { error } = await supabase.from("posts").insert([
+      {
+        user_id: currentUserId,
+        ...newPost,
+      },
+    ]);
+    if (error) console.error(error);
+    else setNewPost({ subject: "", content: "", request_help: false });
+  }
 
-    const fullName = user.user_metadata?.full_name;
-    const payload: Message = {
-      username: fullName || user.email, // Keep for backward compatibility
-      fullName: fullName,
-      email: user.email,
-      message,
-    };
+  // Send reply
+  async function sendReply(postId: string | number) {
+    const content = replyText[postId];
+    if (!content?.trim()) return;
 
-    socket.emit("chat message", payload);
-    setMessage("");
-  };
+    const { error } = await supabase.from("replies").insert([
+      {
+        post_id: postId,
+        user_id: currentUserId,
+        content,
+      },
+    ]);
+    if (error) console.error(error);
+    else setReplyText((prev) => ({ ...prev, [postId]: "" }));
+  }
 
   return (
-    <div className="p-4 max-w-md mx-auto">
-      <ul className="border rounded p-2 h-64 overflow-y-auto bg-gray-50 mb-2">
-        {messages.map((msg, i) => {
-          // Prioritize fullName, then username, then email as fallback
-          const displayName = msg.fullName || msg.username || msg.email;
-
-          return (
-            <li
-              key={i}
-              className="mb-1 px-3 py-2 rounded-lg bg-white shadow text-gray-800 break-words"
-            >
-              <strong>{displayName}:</strong> {msg.message}
-            </li>
-          );
-        })}
-      </ul>
-
-      <form onSubmit={handleSubmit} className="flex gap-2">
+    <div className="flex flex-col h-full p-4 space-y-4 overflow-y-auto">
+      {/* New Post Form */}
+      <div className="p-4 border rounded bg-gray-50">
         <input
-          className="flex-1 border rounded p-2"
-          value={message}
-          onChange={(e) => setMessage(e.target.value)}
-          placeholder="Type a message..."
+          type="text"
+          placeholder="Subject"
+          className="w-full border p-2 rounded mb-2"
+          value={newPost.subject}
+          onChange={(e) => setNewPost({ ...newPost, subject: e.target.value })}
         />
-        <button className="bg-blue-500 text-white px-4 rounded">Send</button>
-      </form>
+        <textarea
+          placeholder="content"
+          className="w-full border p-2 rounded mb-2"
+          value={newPost.content}
+          onChange={(e) => setNewPost({ ...newPost, content: e.target.value })}
+        />
+        <label className="flex items-center mb-2">
+          <input
+            type="checkbox"
+            checked={newPost.request_help}
+            onChange={(e) =>
+              setNewPost({ ...newPost, request_help: e.target.checked })
+            }
+            className="mr-2"
+          />
+          Request Help
+        </label>
+        <button
+          onClick={sendPost}
+          className="bg-blue-500 text-white px-4 py-2 rounded"
+        >
+          Post
+        </button>
+      </div>
+
+      {/* Posts */}
+      {posts.map((post) => (
+        <div key={post.id} className="p-4 border rounded space-y-2 bg-white">
+          <div className="flex justify-between items-center">
+            <span className="font-bold">
+              {post.profiles.full_name} ({post.profiles.role})
+            </span>
+            {post.request_help && (
+              <span className="text-red-500 font-semibold">Help Requested</span>
+            )}
+          </div>
+          <h3 className="font-semibold">{post.subject}</h3>
+          <p>{post.content}</p>
+
+          {/* Replies */}
+          <div className="pl-4 mt-2 border-l space-y-2">
+            {post.replies?.map((reply) => (
+              <div key={reply.id} className="p-2 rounded bg-gray-100">
+                <span className="font-bold">{reply.profiles.full_name}:</span>{" "}
+                {reply.content}
+              </div>
+            ))}
+
+            {/* Reply Input */}
+            <div className="flex mt-2">
+              <input
+                type="text"
+                className="flex-1 border rounded p-2 mr-2"
+                placeholder="Write a reply..."
+                value={replyText[post.id] || ""}
+                onChange={(e) =>
+                  setReplyText((prev) => ({
+                    ...prev,
+                    [post.id]: e.target.value,
+                  }))
+                }
+                onKeyDown={(e) => e.key === "Enter" && sendReply(post.id)}
+              />
+              <button
+                onClick={() => sendReply(post.id)}
+                className="bg-blue-500 text-white px-4 py-2 rounded"
+              >
+                Reply
+              </button>
+            </div>
+          </div>
+        </div>
+      ))}
     </div>
   );
 }
