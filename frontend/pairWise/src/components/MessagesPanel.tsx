@@ -3,6 +3,7 @@ import { supabase } from "../lib/supabaseClient";
 
 interface PostsPanelProps {
   currentUserId: string;
+  userRole: string;
   threadId: string;
 }
 
@@ -24,6 +25,7 @@ interface Post {
   subject: string;
   content: string;
   request_help: boolean;
+  start_session?: boolean;
   created_at: string;
   user_id: string;
   thread_id: string;
@@ -35,15 +37,17 @@ interface NewPost {
   subject: string;
   content: string;
   request_help: boolean;
+  start_session: boolean;
 }
-
 export default function PostsPanel({
   currentUserId,
+  userRole,
   threadId,
 }: PostsPanelProps) {
   const [newPost, setNewPost] = useState<NewPost>({
     subject: "",
     content: "",
+    start_session: false,
     request_help: false,
   });
 
@@ -63,6 +67,7 @@ export default function PostsPanel({
           subject,
           content,
           request_help,
+          start_session,
           created_at,
           user_id,
           thread_id,
@@ -111,6 +116,7 @@ export default function PostsPanel({
               subject,
               content,
               request_help,
+              start_session,
               created_at,
               user_id,
               thread_id,
@@ -174,6 +180,33 @@ export default function PostsPanel({
     };
   }, [threadId]); // Re-run when threadId changes
 
+  // Listen for session start posts to redirect students
+  useEffect(() => {
+    const channel = supabase
+      .channel("session_posts")
+      .on(
+        "postgres_changes",
+        {
+          event: "INSERT",
+          schema: "public",
+          table: "posts",
+          filter: `thread_id=eq.${threadId}`,
+        },
+        (payload) => {
+          const post = payload.new as Post;
+          if (post.start_session && userRole === "student") {
+            // 👇 redirect student to editor page with specific post ID
+            window.location.href = `/editor/${post.id}`;
+          }
+        }
+      )
+      .subscribe();
+
+    return () => {
+      supabase.removeChannel(channel);
+    };
+  }, [threadId, userRole]);
+
   // Send new post
   async function sendPost() {
     if (!newPost.subject.trim() && !newPost.content.trim()) return;
@@ -189,8 +222,29 @@ export default function PostsPanel({
     if (error) {
       console.error("Error creating post:", error);
     } else {
-      setNewPost({ subject: "", content: "", request_help: false });
+      setNewPost({
+        subject: "",
+        content: "",
+        request_help: false,
+        start_session: false,
+      });
       // Real-time subscription will handle adding the post to the UI
+    }
+  }
+
+  // Handle mentor joining a coding session
+  async function handleMentorJoin(postId: string | number) {
+    // Update the post to indicate session has started
+    const { error } = await supabase
+      .from("posts")
+      .update({ start_session: true })
+      .eq("id", postId);
+
+    if (error) {
+      console.error("Error starting session:", error);
+    } else {
+      // Navigate to editor
+      window.location.href = `/editor/${postId}`;
     }
   }
 
@@ -232,11 +286,19 @@ export default function PostsPanel({
                 <span className="font-bold">
                   {post.profiles.full_name} ({post.profiles.role})
                 </span>
-                {post.request_help && (
-                  <span className="text-red-500 font-semibold">
-                    Help Requested
-                  </span>
-                )}
+                {post.request_help &&
+                  (userRole === "mentor" ? (
+                    <button
+                      className="bg-blue-600 hover:bg-blue-700 text-white font-semibold px-3 py-1 rounded transition-colors cursor-pointer"
+                      onClick={() => handleMentorJoin(post.id)}
+                    >
+                      Help Requested - Join live coding session
+                    </button>
+                  ) : (
+                    <span className="text-red-500 font-semibold">
+                      Help Requested
+                    </span>
+                  ))}
               </div>
               <h3 className="font-semibold">{post.subject}</h3>
               <p>{post.content}</p>
@@ -302,7 +364,11 @@ export default function PostsPanel({
               type="checkbox"
               checked={newPost.request_help}
               onChange={(e) =>
-                setNewPost({ ...newPost, request_help: e.target.checked })
+                setNewPost({
+                  ...newPost,
+                  request_help: e.target.checked,
+                  start_session: e.target.checked,
+                })
               }
               className="mr-2"
             />

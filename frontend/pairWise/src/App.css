@@ -1,1 +1,10 @@
-@import "tailwindcss";
+/* App specific styles */
+.App {
+  text-align: center;
+}
+
+/* Override any conflicting styles */
+.editor-container {
+  height: 100%;
+  width: 100%;
+}

@@ -25,8 +25,13 @@ const io = new Server(server, {
 io.on("connection", (socket) => {
   console.log("User connected:", socket.id);
 
-  socket.on("chat message", (msg) => {
-    io.emit("chat message", msg);
+  socket.on("join-thread", (threadId) => {
+    socket.join(threadId);
+  });
+
+  socket.on("editor-change", ({ threadId, content }) => {
+    // Broadcast to everyone else in the same thread
+    socket.to(threadId).emit("editor-update", content);
   });
 
   socket.on("disconnect", () => {

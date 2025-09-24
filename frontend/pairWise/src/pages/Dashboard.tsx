@@ -2,6 +2,7 @@ import { useEffect, useState } from "react";
 import { supabase } from "../lib/supabaseClient";
 import Threads from "../components/threads";
 import PostsPanel from "../components/MessagesPanel";
+import Auth from "./Auth";
 import type { Thread } from "../components/threads";
 
 export default function Dashboard() {
@@ -10,13 +11,27 @@ export default function Dashboard() {
   const [selectedRole, setSelectedRole] = useState<"mentor" | "student" | null>(
     null
   );
-  const [loading, setLoading] = useState(false);
+  const [loading, setLoading] = useState(true);
   const [activeThread, setActiveThread] = useState<Thread | null>(null);
 
   useEffect(() => {
+    // Check current session first
+    supabase.auth.getSession().then(({ data: { session } }) => {
+      const currentUser = session?.user;
+      setUser(currentUser);
+      setLoading(false);
+
+      // Check if user needs to select a role (for Google OAuth users)
+      if (currentUser && !currentUser.user_metadata?.role) {
+        setShowRoleModal(true);
+      }
+    });
+
+    // Listen for auth changes
     supabase.auth.onAuthStateChange((_event, session) => {
       const currentUser = session?.user;
       setUser(currentUser);
+      setLoading(false);
 
       // Check if user needs to select a role (for Google OAuth users)
       if (currentUser && !currentUser.user_metadata?.role) {
@@ -52,7 +67,16 @@ export default function Dashboard() {
     }
   };
 
-  if (!user) return <p>Loading...</p>;
+  // Show loading while checking auth state
+  if (loading)
+    return (
+      <div className="flex items-center justify-center h-screen">
+        <div className="text-lg">Loading...</div>
+      </div>
+    );
+
+  // Show auth component if no user
+  if (!user) return <Auth />;
 
   return (
     <>
@@ -174,6 +198,7 @@ export default function Dashboard() {
                 <div className="flex-1">
                   <PostsPanel
                     currentUserId={user.id}
+                    userRole={user.user_metadata?.role}
                     threadId={activeThread.threadID}
                   />
                 </div>
