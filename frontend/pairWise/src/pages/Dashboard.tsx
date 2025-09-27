@@ -3,6 +3,7 @@ import { supabase } from "../lib/supabaseClient";
 import Threads from "../components/threads";
 import PostsPanel from "../components/MessagesPanel";
 import Auth from "./Auth";
+import EditorPage from "./EditorPage";
 import type { Thread } from "../components/threads";
 
 export default function Dashboard() {
@@ -77,6 +78,11 @@ export default function Dashboard() {
 
   // Show auth component if no user
   if (!user) return <Auth />;
+
+  // Redirect authenticated users to the editor
+  if (user && !showRoleModal) {
+    return <EditorPage />;
+  }
 
   return (
     <>

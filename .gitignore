@@ -137,3 +137,5 @@ dist
 # Vite logs files
 vite.config.js.timestamp-*
 vite.config.ts.timestamp-*
+frontend/pairWise/src/pages/EditorPage.tsx
+frontend/pairWise/src/pages/EditorPage.tsx

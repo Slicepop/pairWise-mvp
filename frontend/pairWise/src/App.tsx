@@ -1,6 +1,6 @@
 import { useState, useEffect } from "react";
 import Auth from "./pages/Auth";
-import Dashboard from "./pages/Dashboard";
+import EditorPage from "./pages/EditorPage";
 import { supabase } from "./lib/supabaseClient";
 
 function App() {
@@ -13,7 +13,8 @@ function App() {
     );
   }, []);
 
-  return <div>{user ? <Dashboard /> : <Auth />}</div>;
+  // For testing purposes, redirect to EditorPage instead of Dashboard
+  return <div>{user ? <EditorPage /> : <Auth />}</div>;
 }
 
 export default App;

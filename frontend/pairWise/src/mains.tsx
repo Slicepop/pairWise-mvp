@@ -9,8 +9,9 @@ ReactDOM.createRoot(document.getElementById("root")!).render(
   <React.StrictMode>
     <BrowserRouter>
       <Routes>
-        <Route path="/" element={<Dashboard />} />
-        <Route path="/editor/:postID" element={<EditorPage />} />
+        {/* <Route path="/" element={<Dashboard />} /> */}
+        <Route path="/" element={<EditorPage />} />
+        {/* <Route path="/editor/:postID" element={<EditorPage />} /> */}
       </Routes>
     </BrowserRouter>
   </React.StrictMode>
