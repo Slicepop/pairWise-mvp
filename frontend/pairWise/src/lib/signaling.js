@@ -111,4 +111,59 @@ export async function createDataChannel() {
 }
 
 //    GUEST
-export async function guestAcceptConnection() {}
+export async function guestAcceptConnection() {
+  let answer = null;
+  const { data } = await supabase
+    .from("sessions")
+    .select("hostSignal, hostID")
+    .eq("postID", tempPostID);
+  if (data[0].hostSignal) {
+    await pc.setRemoteDescription(
+      new RTCSessionDescription(data[0].hostSignal)
+    );
+    console.log("remote description set");
+    answer = await pc.createAnswer();
+    await pc.setLocalDescription(answer);
+    console.log("Answer created and set as local description");
+  }
+  supabase
+    .channel("session_changes")
+    .on(
+      "postgres_changes",
+      {
+        event: "UPDATE",
+        schema: "public",
+        table: "sessions",
+        filter: `postID=eq.${tempPostID}`,
+      },
+      (payload) => {
+        const updatedRow = payload.new;
+        if (updatedRow.hostCandidates) {
+          updatedRow.hostCandidates.forEach((candidate) => {
+            const ice = new RTCIceCandidate(candidate);
+            if (pc.remoteDescription) {
+              pc.addIceCandidate(ice).catch(console.error);
+            } else {
+              hostCandidatesArr.push(ice);
+            }
+          });
+        }
+      }
+    )
+    .subscribe();
+  try {
+    const { error } = await supabase
+      .from("sessions")
+      .update([
+        {
+          postID: tempPostID,
+          guestSignal: answer,
+          guestID: cachedUserID,
+        },
+      ])
+      .eq("postID", tempPostID);
+    console.log("Guest sent answer to supabase");
+  } catch (error) {
+    console.error(error);
+  }
+}
