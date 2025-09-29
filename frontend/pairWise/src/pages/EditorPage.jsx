@@ -1,6 +1,7 @@
 import { useEffect, useState, useCallback, useRef } from "react";
 import Editor from "@monaco-editor/react";
 import { supabase } from "../lib/supabaseClient";
+import { createDataChannel, getUserID } from "../lib/signaling";
 
 export default function EditorPage() {
   const signalRef = useRef();
@@ -130,13 +131,11 @@ export default function EditorPage() {
     sessionRef.current = true;
 
     async function init() {
-      const {
-        data: { user },
-      } = await supabase.auth.getUser();
-      userRef.current = user.id;
+      userRef.current = await getUserID();
       if (isInitiator) {
-        const offer = await generateSignal();
-        await createSessionServer(offer, tempPostID);
+        await createDataChannel();
+        // // const offer = await generateSignal();
+        // await createSessionServer(offer, tempPostID);
       } else {
         // guest joining session
         // guest will provide host with signal
