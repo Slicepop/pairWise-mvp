@@ -80,9 +80,6 @@ export default function Dashboard() {
   if (!user) return <Auth />;
 
   // Redirect authenticated users to the editor
-  if (user && !showRoleModal) {
-    return <EditorPage />;
-  }
 
   return (
     <>

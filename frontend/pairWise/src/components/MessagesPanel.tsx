@@ -196,7 +196,7 @@ export default function PostsPanel({
           const post = payload.new as Post;
           if (post.start_session && userRole === "student") {
             // 👇 redirect student to editor page with specific post ID
-            window.location.href = `/editor/${post.id}`;
+            window.location.href = `/editor/${post.id}#host`;
           }
         }
       )
