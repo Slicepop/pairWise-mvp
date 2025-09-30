@@ -3,7 +3,6 @@ import { supabase } from "../lib/supabaseClient";
 import Threads from "../components/threads";
 import PostsPanel from "../components/MessagesPanel";
 import Auth from "./Auth";
-import EditorPage from "./EditorPage.jsx";
 import type { Thread } from "../components/threads";
 
 export default function Dashboard() {
