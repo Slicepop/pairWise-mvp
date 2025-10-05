@@ -45,9 +45,14 @@ export async function getUserID() {
     data: { user },
     error,
   } = await supabase.auth.getUser();
-  console.log(user.id);
+
   if (error) throw error;
-  if (!user.id) return null;
+  if (!user || !user.id) {
+    console.log("No authenticated user found");
+    return null;
+  }
+
+  console.log("User ID:", user.id);
   cachedUserID = user.id;
   return cachedUserID;
 }
@@ -78,6 +83,15 @@ export async function createDataChannel() {
   await getUserID();
 
   let setRemoteAnswer = false;
+  // Send host ICE candidates to DB (consider batching)
+  pc.onicecandidate = async (event) => {
+    if (event.candidate) {
+      const c = event.candidate.toJSON();
+      hostCandidatesArr.push(c); // local cache (still fine)
+      console.log("host on ice: ", c);
+      await appendCandidatesToDB("hostCandidates", c);
+    }
+  };
   channel = pc.createDataChannel("text");
 
   const offer = await pc.createOffer();
@@ -128,15 +142,6 @@ export async function createDataChannel() {
     }
   };
   channel.onerror = (err) => console.log("Host channel error:", err);
-
-  // Send host ICE candidates to DB (consider batching)
-  pc.onicecandidate = async (event) => {
-    if (event.candidate) {
-      const c = event.candidate.toJSON();
-      hostCandidatesArr.push(c); // local cache (still fine)
-      await appendCandidatesToDB("hostCandidates", c);
-    }
-  };
 
   // Realtime subscription: handle guestSignal (answer) and guestCandidates
   const sub = supabase
