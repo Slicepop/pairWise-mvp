@@ -5,6 +5,7 @@ import {
   getUserID,
   guestAcceptConnection,
   sendDocument,
+  sendChange,
   sendCursorPosition,
 } from "../lib/signaling";
 
@@ -13,16 +14,15 @@ export default function EditorPage() {
   const editorRef = useRef(null);
   const debounceTimer = useRef(null);
   const lastSentContent = useRef("");
-
   const isInitiator = window.location.hash === "#host";
 
   // Editor state
-  const [editorContent, setEditorContent] = useState(
-    isInitiator ? `console.log("Host");` : `console.log("not Host");`
-  );
+  let remoteUpdate = null;
   const [isUpdatingFromRemote, setIsUpdatingFromRemote] = useState(false);
   const [remoteCursor, setRemoteCursor] = useState(null);
-
+  function handleChangeModelContent(e) {
+    sendChange(e.changes[0]);
+  }
   // Handle editor content changes with smart debouncing
   const handleEditorChange = useCallback(
     (value) => {
@@ -51,7 +51,7 @@ export default function EditorPage() {
           debounceTimer.current = setTimeout(() => {
             sendDocument(value);
             lastSentContent.current = value;
-          }, 150);
+          }, 50);
         }
       }
     },
@@ -60,22 +60,44 @@ export default function EditorPage() {
 
   // Listen for remote editor changes
   useEffect(() => {
+    // const handleRemoteChange = (event) => {
+    //   console.log("Received remote editor change:", event.detail);
+
+    //   // Clear any pending debounced sends to avoid conflicts
+    //   if (debounceTimer.current) {
+    //     clearTimeout(debounceTimer.current);
+    //     debounceTimer.current = null;
+    //   }
+
+    //   setIsUpdatingFromRemote(true);
+    //   setEditorContent(event.detail.content);
+
+    //   // Reset the flag after a shorter delay for better responsiveness
+    //   setTimeout(() => {
+    //     setIsUpdatingFromRemote(false);
+    //   }, 50);
+    // };
     const handleRemoteChange = (event) => {
       console.log("Received remote editor change:", event.detail);
 
-      // Clear any pending debounced sends to avoid conflicts
-      if (debounceTimer.current) {
-        clearTimeout(debounceTimer.current);
-        debounceTimer.current = null;
-      }
+      // // Clear any pending debounced sends to avoid conflicts
+      // if (debounceTimer.current) {
+      //   clearTimeout(debounceTimer.current);
+      //   debounceTimer.current = null;
+      // }
 
-      setIsUpdatingFromRemote(true);
-      setEditorContent(event.detail.content);
+      // setIsUpdatingFromRemote(true);
+      let user = window.location.hash === "#host" ? "host" : "guest";
+      if (event.detail.sender === user) return;
+      console.log("edit not by self", event.detail.sender, user);
+      remoteUpdate = true;
+      editorRef.current.executeEdits("remote", [event.detail.content]);
+      remoteUpdate = false;
 
       // Reset the flag after a shorter delay for better responsiveness
-      setTimeout(() => {
-        setIsUpdatingFromRemote(false);
-      }, 50);
+      // setTimeout(() => {
+      //   setIsUpdatingFromRemote(false);
+      // }, 50);
     };
 
     const handleRemoteCursor = (event) => {
@@ -162,11 +184,14 @@ export default function EditorPage() {
             height="92vh"
             defaultLanguage="javascript"
             theme="vs-dark"
-            value={editorContent}
-            onChange={handleEditorChange}
+            value={"editorContent"}
+            // onChange={handleEditorChange}
             onMount={(editor) => {
               editorRef.current = editor;
-
+              editor.onDidChangeModelContent((e) => {
+                if (remoteUpdate) return;
+                handleChangeModelContent(e);
+              });
               // Track cursor position changes
               editor.onDidChangeCursorPosition((e) => {
                 if (!isUpdatingFromRemote) {

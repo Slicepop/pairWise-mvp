@@ -113,16 +113,20 @@ export async function createDataChannel() {
   // Data channel handlers
   channel.onopen = (event) => console.log("Host: Data channel opened:", event);
   channel.onmessage = (event) => {
-    console.log("Host received message:", event.data);
     try {
       const message = JSON.parse(event.data);
       // Ignore our own messages
       if (message.sender === "host") return;
-      if (message.type === "editor-change") {
+      if (message.type === "editor-content-change") {
+        console.log("Host received message:", message);
         // Dispatch custom event for editor content changes from guest
         window.dispatchEvent(
           new CustomEvent("editor-change-received", {
-            detail: { content: message.content, timestamp: message.timestamp },
+            detail: {
+              content: message.content,
+              timestamp: message.timestamp,
+              sender: message.sender,
+            },
           })
         );
       } else if (message.type === "cursor-position") {
@@ -214,12 +218,12 @@ export async function guestAcceptConnection() {
       console.log("Guest channel state:", channel.readyState);
     };
     channel.onmessage = (evt) => {
-      console.log("Guest received:", evt.data);
       try {
         const message = JSON.parse(evt.data);
-        if (message.type === "editor-change") {
+        if (message.type === "editor-content-change") {
           // Ignore our own messages
           if (message.sender === "guest") return;
+          console.log("Guest received:", message);
 
           // Dispatch custom event for editor content changes from host
           window.dispatchEvent(
@@ -227,6 +231,7 @@ export async function guestAcceptConnection() {
               detail: {
                 content: message.content,
                 timestamp: message.timestamp,
+                sender: message.sender,
               },
             })
           );
@@ -340,15 +345,42 @@ export async function guestAcceptConnection() {
     window.channel = channel;
   }
 }
+export function sendChange(change) {
+  try {
+    if (!channel) {
+      console.warn("No data channel (channel is null)");
+      return;
+    }
+    if (channel.readyState !== "open") {
+      console.warn("Data channel not open:", channel.readyState);
+      return;
+    }
 
+    console.log("ASDSAD");
+    console.log("ASDSADsss");
+    console.log("ASDSAD");
+    // Send editor content as JSON
+    const message = JSON.stringify({
+      type: "editor-content-change",
+      content: change,
+      timestamp: Date.now(),
+      sender: window.location.hash === "#host" ? "host" : "guest", // Use role instead of ID
+    });
+
+    channel.send(message);
+    console.log("Editor content sent successfully");
+  } catch (error) {
+    console.error("Error sending document:", error);
+  }
+}
 // Function to send editor content through data channel
 export function sendDocument(content) {
-  console.log("sendDocument called. Channel state:", {
-    channel: !!channel,
-    readyState: channel?.readyState,
-    pcState: pc.connectionState,
-    signalingState: pc.signalingState,
-  });
+  // console.log("sendDocument called. Channel state:", {
+  //   channel: !!channel,
+  //   readyState: channel?.readyState,
+  //   pcState: pc.connectionState,
+  //   signalingState: pc.signalingState,
+  // });
 
   try {
     if (!channel) {
