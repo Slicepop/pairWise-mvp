@@ -10,8 +10,9 @@ console.log(tempPostID);
 export let channel = null;
 export const pc = new RTCPeerConnection({
   iceServers: [
-    { urls: "stun:stun.l.google.com:19302" },
-    { urls: "stun:stun1.l.google.com:19302" },
+    {
+      urls: ["stun:stun.l.google.com:19302", "stun:stun1.l.google.com:19302"],
+    },
   ],
 });
 
@@ -19,6 +20,8 @@ export const pc = new RTCPeerConnection({
 pc.onconnectionstatechange = () => {
   if (pc.connectionState === "connected") {
     console.log("🎉 WebRTC connection fully established!");
+  } else {
+    console.log("Guest pc.connectionState:", pc.connectionState);
   }
 };
 
@@ -28,7 +31,7 @@ pc.oniceconnectionstatechange = () => {
     pc.iceConnectionState === "completed"
   ) {
     console.log("🎉 ICE connection established!");
-  }
+  } else console.log("Guest pc.iceConnectionState:", pc.iceConnectionState);
 };
 
 pc.onsignalingstatechange = () => {
@@ -213,6 +216,7 @@ export async function guestAcceptConnection() {
   await getUserID();
 
   pc.ondatachannel = (event) => {
+    console.log("ondatacahnnel event triggered!!!!");
     channel = event.channel;
     channel.onopen = () => {
       console.log("Guest channel state:", channel.readyState);
@@ -326,6 +330,11 @@ export async function guestAcceptConnection() {
       (payload) => {
         const updatedRow = payload.new;
         if (updatedRow.hostCandidates) {
+          console.log(
+            "Guest: Received X host candidates",
+            updatedRow.hostCandidates?.length || 0,
+            updatedRow.hostCandidates
+          );
           updatedRow.hostCandidates.forEach((candidate) => {
             const ice = new RTCIceCandidate(candidate);
             if (pc.remoteDescription) {
