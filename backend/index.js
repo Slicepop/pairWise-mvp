@@ -9,7 +9,7 @@ const server = createServer(app);
 app.use(
   cors({
     // origin: "http://localhost:5174",
-    origin: "https://pair-wise-mvp.vercel.app",
+    origin: "https://pair-wise.vercel.app",
     methods: ["GET", "POST"],
     credentials: true,
   })
@@ -22,7 +22,7 @@ const io = new Server(server, {
 
   cors: {
     // origin: "http://localhost:5174",
-    origin: "https://pair-wise-mvp.vercel.app",
+    origin: "https://pair-wise.vercel.app",
     methods: ["GET", "POST"],
     credentials: true,
   },
