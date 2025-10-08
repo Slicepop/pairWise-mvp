@@ -6,7 +6,7 @@ export default function EditorPage() {
 
   function editorInit(editor) {
     let remoteUpdating;
-    const socket = io("https://pairwise-mvp.onrender.com:10000");
+    const socket = io("https://pairwise-mvp.onrender.com");
     socket.on("connect", () => {
       console.log("Connected to Socket.IO server");
     });
