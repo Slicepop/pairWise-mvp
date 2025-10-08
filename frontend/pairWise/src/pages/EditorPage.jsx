@@ -5,6 +5,7 @@ export default function EditorPage() {
   const sessionID = window.location.pathname.split("/")[2];
 
   function editorInit(editor) {
+    let remoteUpdating;
     const socket = io("http://localhost:10000");
     socket.on("connect", () => {
       console.log("Connected to Socket.IO server");
@@ -12,11 +13,19 @@ export default function EditorPage() {
     socket.io.on("error", (error) => {
       console.error(error);
     });
-
+    socket.emit("join_session", { sessionID: sessionID });
+    socket.on("remote_editorChange", (e) => {
+      remoteUpdating = true;
+      console.log(e.changedData);
+      editor.executeEdits("remote", e.changedData);
+      remoteUpdating = false;
+    });
     editor.onDidChangeModelContent((e) => {
-      socket.emit("join_session", {
-        sessionUUID: sessionID,
-        dataChanged: e.changes[0],
+      if (remoteUpdating) return;
+      console.log("editor changed");
+      socket.emit("editorChange", {
+        sessionID: sessionID,
+        dataChanged: e.changes,
       });
     });
   }
