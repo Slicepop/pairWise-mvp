@@ -8,19 +8,21 @@ const server = createServer(app);
 
 app.use(
   cors({
-    origin: "https://pair-wise-mvp.vercel.app",
+    origin: "http://localhost:5174",
+    // origin: "https://pair-wise-mvp.vercel.app",
     methods: ["GET", "POST"],
     credentials: true,
   })
 );
 
-// Optional root route for testing
 app.get("/", (req, res) => res.send("Socket.IO server running!"));
 
 const io = new Server(server, {
   path: "/socket.io",
+
   cors: {
-    origin: "https://pair-wise-mvp.vercel.app",
+    origin: "http://localhost:5174",
+    // origin: "https://pair-wise-mvp.vercel.app",
     methods: ["GET", "POST"],
     credentials: true,
   },
@@ -29,12 +31,13 @@ const io = new Server(server, {
 io.on("connection", (socket) => {
   console.log("User connected:", socket.id);
 
-  socket.on("join-thread", (threadId) => {
-    socket.join(threadId);
-  });
+  socket.on("join_session", (data) => {
+    const sessionID = data.sessionUUID;
 
-  socket.on("editor-change", ({ threadId, content }) => {
-    socket.to(threadId).emit("editor-update", content);
+    socket.join(sessionID);
+    console.log(`Socket ${socket.id} joined room ${sessionID}`);
+    console.log("data changed: ", data.dataChanged);
+    socket.to(sessionID).emit("user_joined", { userID: socket.id });
   });
 
   socket.on("disconnect", () => console.log("User disconnected:", socket.id));
