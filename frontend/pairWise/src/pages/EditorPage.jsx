@@ -7,6 +7,8 @@ export default function EditorPage() {
   function editorInit(editor) {
     let remoteUpdating;
     const socket = io("https://pairwise-mvp.onrender.com");
+    // const socket = io("http://localhost:10000");
+
     socket.on("connect", () => {
       console.log("Connected to Socket.IO server");
     });
@@ -20,6 +22,41 @@ export default function EditorPage() {
       editor.executeEdits("remote", e.changedData);
       remoteUpdating = false;
     });
+    socket.on("remote_cursorChange", (e) => {
+      console.log("remote cursor change", e.lineNumber, e.column);
+      const oldDecorations = editor._remoteCursorDecorations || [];
+
+      const newDecorations = editor.deltaDecorations(oldDecorations, [
+        {
+          range: {
+            startLineNumber: e.lineNumber,
+            startColumn: e.column,
+            endLineNumber: e.lineNumber,
+            endColumn: e.column + 1,
+          },
+          options: {
+            className: "remote-cursor-decoration",
+            beforeContentClassName: "remote-cursor-indicator",
+          },
+        },
+      ]);
+
+      editor._remoteCursorDecorations = newDecorations;
+    });
+
+    editor.onDidChangeCursorPosition((e) => {
+      if (remoteUpdating) return;
+      const { lineNumber, column } = e.position;
+      clearTimeout(editor._cursorTimer);
+      editor._cursorTimer = setTimeout(() => {
+        socket.emit("cursorChange", {
+          sessionID: sessionID,
+          lineNumber: lineNumber,
+          column: column,
+        });
+      }, 100);
+    });
+
     editor.onDidChangeModelContent((e) => {
       if (remoteUpdating) return;
       console.log("editor changed");

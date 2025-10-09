@@ -51,7 +51,21 @@ io.on("connection", (socket) => {
       socket
         .to(sessionID)
         .emit("remote_editorChange", { changedData: event.dataChanged });
-      console.log("data changed: ", event.dataChanged);
+      // console.log("data changed: ", event.dataChanged);
+    });
+    socket.on("cursorChange", (event) => {
+      const sessionID = event.sessionID;
+      if (!sessionID || !socket.rooms.has(sessionID)) {
+        console.error(
+          `Socket ${socket.id} tried to send change without being in room ${sessionID}`
+        );
+        return;
+      }
+      socket.to(sessionID).emit("remote_cursorChange", {
+        lineNumber: event.lineNumber,
+        column: event.column,
+      });
+      console.log("cursor change", event.lineNumber, event.column);
     });
   } catch (e) {
     console.log(e);
