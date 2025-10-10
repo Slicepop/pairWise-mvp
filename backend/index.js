@@ -8,8 +8,8 @@ const server = createServer(app);
 
 app.use(
   cors({
-    // origin: "http://localhost:5174",
-    origin: "https://pair-wise.vercel.app",
+    origin: "http://localhost:5173",
+    // origin: "https://pair-wise.vercel.app",
     methods: ["GET", "POST"],
     credentials: true,
   })
@@ -21,8 +21,8 @@ const io = new Server(server, {
   path: "/socket.io",
 
   cors: {
-    // origin: "http://localhost:5174",
-    origin: "https://pair-wise.vercel.app",
+    origin: "http://localhost:5173",
+    // origin: "https://pair-wise.vercel.app",
     methods: ["GET", "POST"],
     credentials: true,
   },
@@ -38,6 +38,13 @@ io.on("connection", (socket) => {
     console.log(`Socket ${socket.id} joined room ${sessionID}`);
 
     socket.to(sessionID).emit("user_joined", { userID: socket.id });
+  });
+  socket.on("send_document", (event) => {
+    console.log(event.document);
+    socket.to(event.sessionID).emit("update_document", {
+      sessionID: event.sessionID,
+      document: event.document,
+    });
   });
   try {
     socket.on("editorChange", (event) => {
@@ -62,10 +69,12 @@ io.on("connection", (socket) => {
         return;
       }
       socket.to(sessionID).emit("remote_cursorChange", {
-        lineNumber: event.lineNumber,
-        column: event.column,
+        startLineNumber: event.startLineNumber,
+        startColumn: event.startColumn,
+        endLineNumber: event.endLineNumber,
+        endColumn: event.endColumn,
       });
-      console.log("cursor change", event.lineNumber, event.column);
+      console.log("cursor change", event);
     });
   } catch (e) {
     console.log(e);

@@ -6,11 +6,9 @@ export default function EditorPage() {
 
   function editorInit(editor) {
     let remoteUpdating;
-    const socket = io("https://pairwise-mvp.onrender.com");
-    // const socket = io("http://localhost:10000");
-
     // const socket = io("https://pairwise-mvp.onrender.com");
     const socket = io("http://localhost:10000");
+
     socket.on("connect", () => {
       console.log("Connected to Socket.IO server");
     });
@@ -18,6 +16,19 @@ export default function EditorPage() {
       console.error(error);
     });
     socket.emit("join_session", { sessionID: sessionID });
+    socket.on("user_joined", (e) => {
+      console.log("user joinged");
+      socket.emit("send_document", {
+        sessionID: sessionID,
+        document: editor.getValue(),
+      });
+    });
+
+    socket.on("update_document", (e) => {
+      remoteUpdating = true;
+      editor.setValue(e.document);
+      remoteUpdating = false;
+    });
     socket.on("remote_editorChange", (e) => {
       remoteUpdating = true;
       console.log(e.changedData);
@@ -31,10 +42,10 @@ export default function EditorPage() {
       const newDecorations = editor.deltaDecorations(oldDecorations, [
         {
           range: {
-            startLineNumber: e.lineNumber,
-            startColumn: e.column,
-            endLineNumber: e.lineNumber,
-            endColumn: e.column + 1,
+            startLineNumber: e.startLineNumber,
+            startColumn: e.startColumn,
+            endLineNumber: e.endLineNumber,
+            endColumn: e.endColumn,
           },
           options: {
             className: "remote-cursor-decoration",
@@ -48,13 +59,16 @@ export default function EditorPage() {
 
     editor.onDidChangeCursorPosition((e) => {
       if (remoteUpdating) return;
-      const { lineNumber, column } = e.position;
+      const { startLineNumber, startColumn, endLineNumber, endColumn } =
+        editor.getSelection();
       clearTimeout(editor._cursorTimer);
       editor._cursorTimer = setTimeout(() => {
         socket.emit("cursorChange", {
           sessionID: sessionID,
-          lineNumber: lineNumber,
-          column: column,
+          startLineNumber: startLineNumber,
+          startColumn: startColumn,
+          endLineNumber: endLineNumber,
+          endColumn: endColumn,
         });
       }, 100);
     });
