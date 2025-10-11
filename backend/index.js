@@ -46,6 +46,14 @@ io.on("connection", (socket) => {
       document: event.document,
     });
   });
+  socket.on("sync_document", (event) => {
+    console.log(event.document);
+    socket.to(event.sessionID).emit("remote_sync_document", {
+      sessionID: event.sessionID,
+      document: event.document,
+    });
+  });
+
   try {
     socket.on("editorChange", (event) => {
       const sessionID = event.sessionID;

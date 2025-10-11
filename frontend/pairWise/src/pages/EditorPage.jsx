@@ -9,6 +9,18 @@ export default function EditorPage() {
     // const socket = io("https://pairwise-mvp.onrender.com");
     const socket = io("http://localhost:10000");
 
+    let doumentTimer;
+    function updateDocument() {
+      doumentTimer = setTimeout(() => {
+        socket.emit("sync_document", {
+          sessionID: sessionID,
+          document: editor.getValue(),
+        });
+        console.log("sent Document");
+        updateDocument();
+      }, 15000);
+    }
+    updateDocument();
     socket.on("connect", () => {
       console.log("Connected to Socket.IO server");
     });
@@ -25,6 +37,13 @@ export default function EditorPage() {
     });
 
     socket.on("update_document", (e) => {
+      remoteUpdating = true;
+      editor.setValue(e.document);
+      remoteUpdating = false;
+    });
+    socket.on("remote_sync_document", (e) => {
+      if (editor.getValue() === e.document) return;
+      console.log("document out of sync, resyncing");
       remoteUpdating = true;
       editor.setValue(e.document);
       remoteUpdating = false;
