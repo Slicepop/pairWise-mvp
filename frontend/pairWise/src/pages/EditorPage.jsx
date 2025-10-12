@@ -1,15 +1,17 @@
 import Editor from "@monaco-editor/react";
 import { io, Socket } from "socket.io-client";
 import SplitPane from "react-split-pane";
+import { useState, useRef } from "react";
 export default function EditorPage() {
   const sessionID = window.location.pathname.split("/")[2];
-  let editorRef;
-  let socketRef;
+  let socketRef = useRef(null);
+  const editorRef = useRef(null);
+  const [outputText, setOutputText] = useState("Output:");
   function editorInit(editor) {
     let remoteUpdating;
     // const socket = io("https://pairwise-mvp.onrender.com");
     const socket = io("http://localhost:10000");
-    socketRef = socket;
+    socketRef.current = socket;
     let doumentTimer;
     function updateDocument() {
       doumentTimer = setTimeout(() => {
@@ -76,7 +78,14 @@ export default function EditorPage() {
 
       editor._remoteCursorDecorations = newDecorations;
     });
-
+    socket.on("code_running", (e) => {
+      setOutputText("Running....");
+      console.log("running");
+    });
+    socket.on("code_execution_output", (e) => {
+      setOutputText(e.output);
+      console.log(e.output);
+    });
     editor.onDidChangeCursorPosition((e) => {
       if (remoteUpdating) return;
       const { startLineNumber, startColumn, endLineNumber, endColumn } =
@@ -103,10 +112,10 @@ export default function EditorPage() {
     });
   }
   function handleRunCode() {
-    console.log(editorRef.getValue());
-    socketRef.emit("initiate_code_execution", {
+    console.log(editorRef.current.getValue());
+    socketRef.current.emit("initiate_code_execution", {
       sessionID: sessionID,
-      document: editorRef.getValue(),
+      document: editorRef.current.getValue(),
     });
   }
   return (
@@ -131,7 +140,7 @@ export default function EditorPage() {
             theme="vs-dark"
             value={"editorContent"}
             onMount={(editor) => {
-              editorRef = editor;
+              editorRef.current = editor;
               editorInit(editor);
             }}
             options={{
@@ -157,7 +166,7 @@ export default function EditorPage() {
           </div>
 
           <div className="outputDiv flex-grow min-h-0 p-3 text-sm text-green-400 bg-black rounded-lg border border-gray-700 overflow-auto font-mono">
-            <p className="text-gray-400 mb-2">Output:</p>
+            <p className="text-gray-400 mb-2">{outputText}</p>
           </div>
         </div>
       </SplitPane>

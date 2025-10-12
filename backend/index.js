@@ -16,7 +16,27 @@ app.use(
 );
 
 app.get("/", (req, res) => res.send("Socket.IO server running!"));
+const url =
+  "https://judge0-ce.p.rapidapi.com/submissions?base64_encoded=false&wait=true";
 
+async function runCode(text) {
+  const options = {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      "X-RapidAPI-Key": "",
+      "X-RapidAPI-Host": "judge0-ce.p.rapidapi.com",
+    },
+    body: JSON.stringify({
+      source_code: text,
+      language_id: 63,
+    }),
+  };
+  const res = await fetch(url, options);
+  const result = await res.json();
+  console.log(result.stdout);
+  return result.stdout;
+}
 const io = new Server(server, {
   path: "/socket.io",
 
@@ -40,46 +60,31 @@ io.on("connection", (socket) => {
     socket.to(sessionID).emit("user_joined", { userID: socket.id });
   });
   socket.on("send_document", (event) => {
-    console.log(event.document);
+    // console.log(event.document);
     socket.to(event.sessionID).emit("update_document", {
       sessionID: event.sessionID,
       document: event.document,
     });
   });
   socket.on("sync_document", (event) => {
-    console.log(event.document);
+    // console.log(event.document);
     socket.to(event.sessionID).emit("remote_sync_document", {
       sessionID: event.sessionID,
       document: event.document,
     });
   });
-  socket.on("initiate_code_execution", (event) => {
+  socket.on("initiate_code_execution", async (event) => {
     console.log("code execution initiated", event.document);
-
-    const runCode = async () => {
-      const url =
-        "https://judge0-ce.p.rapidapi.com/submissions?base64_encoded=false&wait=true";
-
-      const options = {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          "X-RapidAPI-Key":
-            ",
-          "X-RapidAPI-Host": "judge0-ce.p.rapidapi.com",
-        },
-        body: JSON.stringify({
-          source_code: event.document,
-          language_id: 63, // Python 3
-        }),
-      };
-
-      const res = await fetch(url, options);
-      const result = await res.json();
-      console.log(result.stdout);
-    };
-
-    runCode();
+    io.to(event.sessionID).emit("code_running", {
+      sessionID: event.sessionID,
+    });
+    console.log("code running");
+    const output = await runCode(event.document);
+    io.to(event.sessionID).emit("code_execution_output", {
+      sessionID: event.sessionID,
+      output: output,
+    });
+    console.log("code ran");
   });
 
   try {
