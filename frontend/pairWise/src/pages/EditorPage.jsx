@@ -1,14 +1,15 @@
 import Editor from "@monaco-editor/react";
 import { io, Socket } from "socket.io-client";
-
+import SplitPane from "react-split-pane";
 export default function EditorPage() {
   const sessionID = window.location.pathname.split("/")[2];
-
+  let editorRef;
+  let socketRef;
   function editorInit(editor) {
     let remoteUpdating;
     // const socket = io("https://pairwise-mvp.onrender.com");
     const socket = io("http://localhost:10000");
-
+    socketRef = socket;
     let doumentTimer;
     function updateDocument() {
       doumentTimer = setTimeout(() => {
@@ -101,31 +102,65 @@ export default function EditorPage() {
       });
     });
   }
-
+  function handleRunCode() {
+    console.log(editorRef.getValue());
+    socketRef.emit("initiate_code_execution", {
+      sessionID: sessionID,
+      document: editorRef.getValue(),
+    });
+  }
   return (
-    <>
-      <div className="relative h-screen bg-gray-700">
-        <div className="flex-1">
+    // 1. Set full height and padding on the root container
+    <div className="h-screen w-screen p-4 bg-gray-800">
+      <SplitPane
+        split="vertical"
+        defaultSize="60%"
+        minSize={250}
+        maxSize={-300}
+        // 2. CRITICAL: Add the h-full class to the SplitPane component itself!
+        className="h-full"
+        // 3. Add a class for the resizer bar so it's visible and easy to grab
+        resizerClassName="bg-gray-600 hover:bg-blue-500 transition-colors duration-200 w-2 cursor-col-resize"
+      >
+        {/* 1. Left Panel: Code Editor */}
+        <div className="flex-grow h-full bg-gray-900 shadow-xl rounded-l-xl overflow-hidden p-4 border border-r-0 border-gray-700">
           <Editor
-            width="85vw"
-            height="92vh"
+            width="100%"
+            height="100%"
             defaultLanguage="javascript"
             theme="vs-dark"
             value={"editorContent"}
-            // onChange={handleEditorChange}
             onMount={(editor) => {
+              editorRef = editor;
               editorInit(editor);
             }}
             options={{
-              fontSize: 14,
+              fontSize: 16,
               scrollBeyondLastLine: false,
               wordWrap: "on",
               lineNumbers: "on",
               automaticLayout: true,
+              minimap: { enabled: false },
             }}
           />
         </div>
-      </div>
-    </>
+
+        <div className="h-full bg-gray-900 shadow-xl rounded-r-xl p-6 flex flex-col space-y-4 border border-l-0 border-gray-700">
+          <div className="flex items-center justify-between">
+            <h2 className="text-xl font-bold text-gray-200">Console: </h2>
+            <button
+              onClick={handleRunCode}
+              className="px-6 py-2 text-md font-semibold text-white bg-blue-600 rounded-lg shadow-lg hover:bg-blue-500 transition duration-200 focus:outline-none focus:ring-4 focus:ring-blue-500 focus:ring-opacity-50"
+            >
+              ▶ Run Code
+            </button>
+          </div>
+
+          <div className="outputDiv flex-grow min-h-0 p-3 text-sm text-green-400 bg-black rounded-lg border border-gray-700 overflow-auto font-mono">
+            <p className="text-gray-400 mb-2">Output:</p>
+          </div>
+        </div>
+      </SplitPane>
+    </div>
   );
 }

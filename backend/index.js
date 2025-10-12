@@ -53,6 +53,34 @@ io.on("connection", (socket) => {
       document: event.document,
     });
   });
+  socket.on("initiate_code_execution", (event) => {
+    console.log("code execution initiated", event.document);
+
+    const runCode = async () => {
+      const url =
+        "https://judge0-ce.p.rapidapi.com/submissions?base64_encoded=false&wait=true";
+
+      const options = {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          "X-RapidAPI-Key":
+            ",
+          "X-RapidAPI-Host": "judge0-ce.p.rapidapi.com",
+        },
+        body: JSON.stringify({
+          source_code: event.document,
+          language_id: 63, // Python 3
+        }),
+      };
+
+      const res = await fetch(url, options);
+      const result = await res.json();
+      console.log(result.stdout);
+    };
+
+    runCode();
+  });
 
   try {
     socket.on("editorChange", (event) => {
