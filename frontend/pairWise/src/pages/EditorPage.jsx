@@ -9,8 +9,8 @@ export default function EditorPage() {
   const [outputText, setOutputText] = useState("Output:");
   function editorInit(editor) {
     let remoteUpdating;
-    // const socket = io("https://pairwise-mvp.onrender.com");
-    const socket = io("http://localhost:10000");
+    const socket = io("https://pairwise-mvp.onrender.com");
+    // const socket = io("http://localhost:10000");
     socketRef.current = socket;
     let doumentTimer;
     function updateDocument() {
@@ -119,19 +119,16 @@ export default function EditorPage() {
     });
   }
   return (
-    // 1. Set full height and padding on the root container
-    <div className="h-screen w-screen p-4 bg-gray-800">
+    <div className="h-screen w-screen bg-gray-800">
       <SplitPane
         split="vertical"
         defaultSize="60%"
         minSize={250}
         maxSize={-300}
         // 2. CRITICAL: Add the h-full class to the SplitPane component itself!
-        className="h-full"
-        // 3. Add a class for the resizer bar so it's visible and easy to grab
+        className=" h-full w-full p-4"
         resizerClassName="bg-gray-600 hover:bg-blue-500 transition-colors duration-200 w-2 cursor-col-resize"
       >
-        {/* 1. Left Panel: Code Editor */}
         <div className="flex-grow h-full bg-gray-900 shadow-xl rounded-l-xl overflow-hidden p-4 border border-r-0 border-gray-700">
           <Editor
             width="100%"

@@ -10,8 +10,8 @@ dotenv.config();
 
 app.use(
   cors({
-    origin: "http://localhost:5173",
-    // origin: "https://pair-wise.vercel.app",
+    // origin: "http://localhost:5173",
+    origin: "https://pair-wise.vercel.app",
     methods: ["GET", "POST"],
     credentials: true,
   })
@@ -40,14 +40,14 @@ async function runCode(text) {
   console.log("result", result.stdout);
   if (result.stderr) return result.stderr;
   if (result.stdout) return result.stdout;
-  return result.message + "\n\n" + "fuck";
+  return result.message;
 }
 const io = new Server(server, {
   path: "/socket.io",
 
   cors: {
-    origin: "http://localhost:5173",
-    // origin: "https://pair-wise.vercel.app",
+    // origin: "http://localhost:5173",
+    origin: "https://pair-wise.vercel.app",
     methods: ["GET", "POST"],
     credentials: true,
   },
