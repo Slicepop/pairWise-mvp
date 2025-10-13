@@ -166,7 +166,9 @@ export default function EditorPage() {
           </div>
 
           <div className="outputDiv flex-grow min-h-0 p-3 text-sm text-green-400 bg-black rounded-lg border border-gray-700 overflow-auto font-mono">
-            <p className="text-gray-400 mb-2">{outputText}</p>
+            <p className="text-gray-400 mb-2 whitespace-pre-line">
+              {outputText}
+            </p>
           </div>
         </div>
       </SplitPane>

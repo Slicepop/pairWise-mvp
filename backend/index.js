@@ -5,6 +5,8 @@ import { Server } from "socket.io";
 
 const app = express();
 const server = createServer(app);
+import dotenv from "dotenv";
+dotenv.config();
 
 app.use(
   cors({
@@ -24,7 +26,7 @@ async function runCode(text) {
     method: "POST",
     headers: {
       "Content-Type": "application/json",
-      "X-RapidAPI-Key": "",
+      "X-RapidAPI-Key": process.env.JUDGE0_RAPIDAPI_KEY,
       "X-RapidAPI-Host": "judge0-ce.p.rapidapi.com",
     },
     body: JSON.stringify({
@@ -32,10 +34,13 @@ async function runCode(text) {
       language_id: 63,
     }),
   };
+  console.log(process.env.VITE_JUDGE0_RAPIDAPI_KEY);
   const res = await fetch(url, options);
   const result = await res.json();
-  console.log(result.stdout);
-  return result.stdout;
+  console.log("result", result.stdout);
+  if (result.stderr) return result.stderr;
+  if (result.stdout) return result.stdout;
+  return result.message + "\n\n" + "fuck";
 }
 const io = new Server(server, {
   path: "/socket.io",
