@@ -21,27 +21,6 @@ app.get("/", (req, res) => res.send("Socket.IO server running!"));
 const url =
   "https://judge0-ce.p.rapidapi.com/submissions?base64_encoded=false&wait=true";
 
-async function runCode(text) {
-  const options = {
-    method: "POST",
-    headers: {
-      "Content-Type": "application/json",
-      "X-RapidAPI-Key": process.env.JUDGE0_RAPIDAPI_KEY,
-      "X-RapidAPI-Host": "judge0-ce.p.rapidapi.com",
-    },
-    body: JSON.stringify({
-      source_code: text,
-      language_id: 63,
-    }),
-  };
-  console.log(process.env.VITE_JUDGE0_RAPIDAPI_KEY);
-  const res = await fetch(url, options);
-  const result = await res.json();
-  console.log("result", result.stdout);
-  if (result.stderr) return result.stderr;
-  if (result.stdout) return result.stdout;
-  return result.message;
-}
 const io = new Server(server, {
   path: "/socket.io",
 
@@ -53,6 +32,43 @@ const io = new Server(server, {
   },
 });
 
+async function runCode(text, language_id) {
+  const options = {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      "X-RapidAPI-Key": process.env.JUDGE0_RAPIDAPI_KEY,
+      "X-RapidAPI-Host": "judge0-ce.p.rapidapi.com",
+    },
+    body: JSON.stringify({
+      source_code: text,
+      language_id: language_id,
+    }),
+  };
+  console.log(process.env.VITE_JUDGE0_RAPIDAPI_KEY);
+  const res = await fetch(url, options);
+  const result = await res.json();
+  console.log("result", result);
+  if (result.stderr)
+    return {
+      result: result.stderr,
+      time: result.time,
+    };
+  if (result.compile_output)
+    return {
+      result: result.compile_output,
+      time: result.time,
+    };
+  if (result.stdout)
+    return {
+      result: result.stdout,
+      time: result.time,
+    };
+  return {
+    result: result,
+    time: result.time,
+  };
+}
 io.on("connection", (socket) => {
   console.log("User connected:", socket.id);
 
@@ -84,7 +100,7 @@ io.on("connection", (socket) => {
       sessionID: event.sessionID,
     });
     console.log("code running");
-    const output = await runCode(event.document);
+    const output = await runCode(event.document, event.language_id);
     io.to(event.sessionID).emit("code_execution_output", {
       sessionID: event.sessionID,
       output: output,

@@ -1,10 +1,12 @@
 import { useEffect, useState } from "react";
 import { supabase } from "../lib/supabaseClient";
-
+import { useNavigate } from "react-router-dom";
 interface PostsPanelProps {
   currentUserId: string;
   userRole: string;
   threadId: string;
+  language_id: number;
+  language_name: String;
 }
 
 interface Profile {
@@ -32,7 +34,10 @@ interface Post {
   profiles: Profile;
   replies?: Reply[];
 }
-
+interface editorProps {
+  languageID: number;
+  language_name: String;
+}
 interface NewPost {
   subject: string;
   content: string;
@@ -43,6 +48,8 @@ export default function PostsPanel({
   currentUserId,
   userRole,
   threadId,
+  language_id,
+  language_name,
 }: PostsPanelProps) {
   const [newPost, setNewPost] = useState<NewPost>({
     subject: "",
@@ -56,7 +63,6 @@ export default function PostsPanel({
     {}
   );
 
-  // Load posts with author profiles and replies
   useEffect(() => {
     async function loadPosts() {
       const { data, error } = await supabase
@@ -92,7 +98,6 @@ export default function PostsPanel({
 
     loadPosts();
 
-    // Subscribe to new posts
     const postsChannel = supabase
       .channel("posts_changes")
       .on(
@@ -104,10 +109,8 @@ export default function PostsPanel({
         },
         async (payload) => {
           console.log("New post received:", payload);
-          // Only add posts for the current thread
           if (payload.new.thread_id !== threadId) return;
 
-          // Fetch the complete post with profile data
           const { data, error } = await supabase
             .from("posts")
             .select(
@@ -133,7 +136,6 @@ export default function PostsPanel({
       )
       .subscribe();
 
-    // Subscribe to new replies
     const repliesChannel = supabase
       .channel("replies_changes")
       .on(
@@ -145,7 +147,6 @@ export default function PostsPanel({
         },
         async (payload) => {
           console.log("New reply received:", payload);
-          // Fetch the complete reply with profile data
           const { data, error } = await supabase
             .from("replies")
             .select(
@@ -173,14 +174,12 @@ export default function PostsPanel({
       )
       .subscribe();
 
-    // Cleanup subscriptions
     return () => {
       supabase.removeChannel(postsChannel);
       supabase.removeChannel(repliesChannel);
     };
-  }, [threadId]); // Re-run when threadId changes
+  }, [threadId]);
 
-  // Listen for session start posts to redirect students
   useEffect(() => {
     const channel = supabase
       .channel("session_posts")
@@ -194,9 +193,13 @@ export default function PostsPanel({
         },
         (payload) => {
           const post = payload.new as Post;
-          if (post.start_session && userRole === "student") {
-            // 👇 redirect student to editor page with specific post ID
-            window.location.href = `/editor/${post.id}#host`;
+          if (post.start_session) {
+            const data: editorProps = {
+              languageID: language_id,
+              language_name: language_name,
+            };
+            navigate(`/editor/${post.id}`, { state: data });
+            // window.location.href = `/editor/${post.id}#host`;
           }
         }
       )
@@ -207,7 +210,6 @@ export default function PostsPanel({
     };
   }, [threadId, userRole]);
 
-  // Send new post
   async function sendPost() {
     if (!newPost.subject.trim() && !newPost.content.trim()) return;
 
@@ -228,13 +230,10 @@ export default function PostsPanel({
         request_help: false,
         start_session: false,
       });
-      // Real-time subscription will handle adding the post to the UI
     }
   }
-
-  // Handle mentor joining a coding session
+  const navigate = useNavigate();
   async function handleMentorJoin(postId: string | number) {
-    // Update the post to indicate session has started
     const { error } = await supabase
       .from("posts")
       .update({ start_session: true })
@@ -243,12 +242,14 @@ export default function PostsPanel({
     if (error) {
       console.error("Error starting session:", error);
     } else {
-      // Navigate to editor
-      window.location.href = `/editor/${postId}`;
+      const data: editorProps = {
+        languageID: language_id,
+        language_name: language_name,
+      };
+      navigate(`/editor/${postId}`, { state: data });
     }
   }
 
-  // Send reply
   async function sendReply(postId: string | number) {
     const content = replyText[postId];
     if (!content?.trim()) return;
@@ -265,13 +266,11 @@ export default function PostsPanel({
       console.error("Error creating reply:", error);
     } else {
       setReplyText((prev) => ({ ...prev, [postId]: "" }));
-      // Real-time subscription will handle adding the reply to the UI
     }
   }
 
   return (
     <div className="relative h-full">
-      {/* Posts Section - Scrollable with bottom padding to avoid form overlap */}
       <div
         className="absolute inset-0 overflow-y-auto"
         style={{ paddingBottom: "200px" }}
@@ -314,7 +313,6 @@ export default function PostsPanel({
                   </div>
                 ))}
 
-                {/* Reply Input */}
                 <div className="flex mt-2">
                   <input
                     type="text"
@@ -342,7 +340,6 @@ export default function PostsPanel({
         </div>
       </div>
 
-      {/* Absolutely Positioned Form - Always at Bottom */}
       <div className="absolute bottom-0 left-0 right-0 border-t bg-white p-4 shadow-lg">
         <input
           type="text"

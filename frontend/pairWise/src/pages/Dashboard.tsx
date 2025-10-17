@@ -202,6 +202,8 @@ export default function Dashboard() {
                     currentUserId={user.id}
                     userRole={user.user_metadata?.role}
                     threadId={activeThread.threadID}
+                    language_id={activeThread.language_id}
+                    language_name={activeThread.name}
                   />
                 </div>
               </div>

@@ -4,6 +4,7 @@ import { supabase } from "../lib/supabaseClient";
 interface Thread {
   threadID: string;
   name: string;
+  language_id: number;
 }
 
 export type { Thread };
@@ -19,7 +20,7 @@ export default function threads({ onSelect }: ThreadsSidebarProps) {
     async function loadThreads() {
       const { data, error } = await supabase
         .from("threads")
-        .select("threadID, name")
+        .select("threadID, name, language_id")
         .order("name", { ascending: true });
       if (!error && data) setThreads(data);
       console.log(data, error);
