@@ -14,15 +14,20 @@ async function getLanguage() {
   if (postError) return;
   const { data: threadData, error: threadError } = await supabase
     .from("threads")
-    .select("name")
+    .select("name, language_id")
     .eq("threadID", postData.thread_id)
     .single();
   if (threadError) return;
-  return { threadName: threadData.name, postName: postData.subject };
+  return {
+    threadName: threadData.name,
+    language_id: threadData.language_id,
+    postName: postData.subject,
+  };
 }
 
 export default function EditorPage() {
   const sessionID = window.location.pathname.split("/")[2];
+  const [language_ID, setLanguage_ID] = useState("");
   const [language, setLanguage] = useState("");
   const [postName, setPostName] = useState("");
 
@@ -30,6 +35,7 @@ export default function EditorPage() {
     getLanguage().then((lang) => {
       console.log(lang);
       if (lang.threadName) setLanguage(lang.threadName);
+      if (lang.language_id) setLanguage_ID(lang.language_id);
       if (lang.postName) setPostName(lang.postName);
     });
   }, []);
@@ -175,7 +181,6 @@ export default function EditorPage() {
     });
   }
   function handleRunCode() {
-    console.log(state.languageID);
     if (editorRef.current.getValue().trim() == "") {
       setOutputText("Document cannot be blank!");
       return;
@@ -183,7 +188,7 @@ export default function EditorPage() {
     socketRef.current.emit("initiate_code_execution", {
       sessionID: sessionID,
       document: editorRef.current.getValue(),
-      language_id: state.languageID,
+      language_id: language_ID,
     });
   }
   function handleImport() {
