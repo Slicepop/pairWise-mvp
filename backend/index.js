@@ -51,16 +51,21 @@ async function runCode(text, language_id) {
   console.log("result", result);
   if (result.stderr)
     return {
+      type: "error",
       result: result.stderr,
       time: result.time,
     };
   if (result.compile_output)
     return {
+      type: "return",
+
       result: result.compile_output,
       time: result.time,
     };
   if (result.stdout)
     return {
+      type: "return",
+
       result: result.stdout,
       time: result.time,
     };
