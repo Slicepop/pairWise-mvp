@@ -7,11 +7,13 @@ const app = express();
 const server = createServer(app);
 import dotenv from "dotenv";
 dotenv.config();
-
+const FRONTED_URL = "http://localhost:5173";
+// const FRONTED_URL = "https://pair-wise.vercel.app";
 app.use(
   cors({
-    // origin: "http://localhost:5173",
-    origin: "https://pair-wise.vercel.app",
+    // origin: FRONTED_URL,
+    origin: "http://localhost:5173",
+
     methods: ["GET", "POST"],
     credentials: true,
   })
@@ -25,8 +27,9 @@ const io = new Server(server, {
   path: "/socket.io",
 
   cors: {
-    // origin: "http://localhost:5173",
-    origin: "https://pair-wise.vercel.app",
+    // origin: FRONTED_URL,
+    origin: "http://localhost:5173",
+
     methods: ["GET", "POST"],
     credentials: true,
   },
@@ -45,7 +48,6 @@ async function runCode(text, language_id) {
       language_id: language_id,
     }),
   };
-  console.log(process.env.VITE_JUDGE0_RAPIDAPI_KEY);
   const res = await fetch(url, options);
   const result = await res.json();
   console.log("result", result);
@@ -99,6 +101,14 @@ io.on("connection", (socket) => {
       document: event.document,
     });
   });
+  socket.on("Mentor_Show_Student_AI", (event) => {
+    console.log("show student", event.message);
+    socket.to(event.sessionID).emit("Student_Show_AI", {
+      sessionID: event.sessionID,
+      message: event.message,
+    });
+  });
+
   socket.on("initiate_code_execution", async (event) => {
     console.log("code execution initiated", event.document);
     io.to(event.sessionID).emit("code_running", {
