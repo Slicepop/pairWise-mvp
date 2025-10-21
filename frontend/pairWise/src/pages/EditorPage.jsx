@@ -209,6 +209,8 @@ export default function EditorPage() {
       editor._remoteCursorDecorations = newDecorations;
     });
     socket.on("code_running", (e) => {
+      setLLM_TIP(false);
+
       setOutputText("Running....");
       console.log("running");
     });
@@ -251,6 +253,7 @@ export default function EditorPage() {
     });
   }
   function handleRunCode() {
+    setLLM_TIP(false);
     if (editorRef.current.getValue().trim() == "") {
       setOutputText("Document cannot be blank!");
       return;
