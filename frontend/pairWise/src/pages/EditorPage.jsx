@@ -28,67 +28,14 @@ async function getPostDetails() {
   };
 }
 const apiKey = import.meta.env.VITE_OPENROUTER_API_KEY;
-async function runLLM_investigation(output, language) {
-  const response = await fetch(
-    "https://openrouter.ai/api/v1/chat/completions",
-    {
-      method: "POST",
-      headers: {
-        Authorization: "Bearer " + apiKey,
-        "HTTP-Referer": "<YOUR_SITE_URL>", // Optional. Site URL for rankings on openrouter.ai.
-        "X-Title": "<YOUR_SITE_NAME>", // Optional. Site title for rankings on openrouter.ai.
-        "Content-Type": "application/json",
-      },
-      body: JSON.stringify({
-        model: "meta-llama/llama-3.3-8b-instruct:free",
-        messages: [
-          {
-            role: "system",
-            content: `You are an expert, friendly coding mentor for a brand new software engineering student.
 
-A mentor is going to give you a student's code and an error message. Your job is to create a hint for the student, and your entire response must be plain text.
-
-CRITICAL RULES:
-
-DO NOT use any markdown.
-
-DO NOT use backticks (, triple backticks, or hash symbols (#).
-
-DO NOT provide the complete, corrected code. Never fix the student's code for them.
-
-DO NOT USE EMOJIS NOR TABLES
-
-BE ENCOURAGING. The student is a beginner. Use a positive and helpful tone.
-
-Format your response clearly using line breaks, not markdown headings.
-
-YOUR RESPONSE MUST FOLLOW THIS PLAIN TEXT STRUCTURE:
-
-What This Error Means: (In 1 simple sentence, explain the error message.)
-
-Your Hint: (Give a small, direct hint. Point them to the right line or concept. For example, "Take a close look at the text inside your console.log() on line 2. Did you remember to close your string?") OR USE an Example of Correct Syntax: (If relevant, provide a generic example of the correct syntax. DO NOT use the student's code in this example. Just write the code example as plain text.)`,
-          },
-          {
-            role: "user",
-            content:
-              "Student submitted: in the language  \n " + language + output,
-          },
-        ],
-      }),
-    }
-  );
-  const data = await response.json();
-  if (!response.ok) {
-    console.error(data);
-  }
-  return data.choices?.[0]?.message?.content;
-}
 export default function EditorPage() {
   const sessionID = window.location.pathname.split("/")[2];
   const [language_ID, setLanguage_ID] = useState("");
   const [language, setLanguage] = useState("");
   const [postName, setPostName] = useState("");
   const [AI_Suggestions, setAI_Suggestions] = useState(false);
+  const AI_SuggestionsRef = useRef("");
   const userRole = useRef("");
   const [LLM_TIP, setLLM_TIP] = useState(false);
   const [LLM_Response, setLLM_Response] = useState("");
@@ -99,7 +46,6 @@ export default function EditorPage() {
       if (det.postName) setPostName(det.postName);
       if (det.AI_Suggestions != undefined) {
         setAI_Suggestions(det.AI_Suggestions);
-        console.log(det.AI_Suggestions, typeof det.AI_Suggestions);
       }
     });
   }, []);
@@ -128,6 +74,9 @@ export default function EditorPage() {
       userRole.current = role;
     });
   }, []);
+  useEffect(() => {
+    AI_SuggestionsRef.current = AI_Suggestions;
+  }, [AI_Suggestions]);
 
   const [outputText, setOutputText] = useState("Output:");
   function editorInit(editor) {
@@ -223,8 +172,8 @@ export default function EditorPage() {
     socket.on("code_execution_output", async (e) => {
       setOutputText(e.output.result + "\n  " + e.output.time + "ms");
       if (e.output.type === "error") {
-        console.log(userRole.current);
-        if (userRole.current === "mentor") {
+        console.log("suggestions?", AI_Suggestions);
+        if (userRole.current === "mentor" && AI_SuggestionsRef.current) {
           socket.emit("run_LLM", {
             sessionID: sessionID,
             document: editor.getValue(),
