@@ -8,6 +8,7 @@ const server = createServer(app);
 import dotenv from "dotenv";
 dotenv.config();
 const FRONTED_URL = "http://localhost:5173";
+const apiKey = process.env.OPENROUTER_API_KEY;
 // const FRONTED_URL = "https://pair-wise.vercel.app";
 app.use(
   cors({
@@ -108,7 +109,67 @@ io.on("connection", (socket) => {
       message: event.message,
     });
   });
+  socket.on("run_LLM", async (event) => {
+    console.log("run_LLM");
+    const response = await fetch(
+      "https://openrouter.ai/api/v1/chat/completions",
+      {
+        method: "POST",
+        headers: {
+          Authorization: "Bearer " + apiKey,
+          "HTTP-Referer": "<YOUR_SITE_URL>", // Optional. Site URL for rankings on openrouter.ai.
+          "X-Title": "<YOUR_SITE_NAME>", // Optional. Site title for rankings on openrouter.ai.
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          model: "meta-llama/llama-3.3-8b-instruct:free",
+          messages: [
+            {
+              role: "system",
+              content: `You are an expert, friendly coding mentor for a brand new software engineering student.
 
+A mentor is going to give you a student's code and an error message. Your job is to create a hint for the student, and your entire response must be plain text.
+
+CRITICAL RULES:
+
+DO NOT use any markdown.
+
+DO NOT use backticks (, triple backticks, or hash symbols (#).
+
+DO NOT provide the complete, corrected code. Never fix the student's code for them.
+
+DO NOT USE EMOJIS NOR TABLES
+
+BE ENCOURAGING. The student is a beginner. Use a positive and helpful tone.
+
+Format your response clearly using line breaks, not markdown headings.
+
+YOUR RESPONSE MUST FOLLOW THIS PLAIN TEXT STRUCTURE:
+
+What This Error Means: (In 1 simple sentence, explain the error message.)
+
+Your Hint: (Give a small, direct hint. Point them to the right line or concept. For example, "Take a close look at the text inside your console.log() on line 2. Did you remember to close your string?") OR USE an Example of Correct Syntax: (If relevant, provide a generic example of the correct syntax. DO NOT use the student's code in this example. Just write the code example as plain text.)`,
+            },
+            {
+              role: "user",
+              content:
+                "Student submitted: in the language  \n " +
+                event.language +
+                event.output,
+            },
+          ],
+        }),
+      }
+    );
+    const data = await response.json();
+    if (!response.ok) {
+      console.error(data);
+    }
+    socket.emit("LLM_Response", {
+      sessionID: event.sessionID,
+      response: data.choices?.[0]?.message?.content,
+    });
+  });
   socket.on("initiate_code_execution", async (event) => {
     console.log("code execution initiated", event.document);
     io.to(event.sessionID).emit("code_running", {

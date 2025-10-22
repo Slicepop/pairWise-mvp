@@ -126,7 +126,6 @@ export default function EditorPage() {
       const role = session?.user?.user_metadata?.role;
       console.log(role);
       userRole.current = role;
-      // console.log(userRoleType);
     });
   }, []);
 
@@ -136,14 +135,20 @@ export default function EditorPage() {
     // const socket = io("https://pairwise-mvp.onrender.com");
     const socket = io("http://localhost:10000");
     socketRef.current = socket;
-    let doumentTimer;
+    let documentTimer;
+    let cachedDocument;
     function updateDocument() {
-      doumentTimer = setTimeout(() => {
-        socket.emit("sync_document", {
-          sessionID: sessionID,
-          document: editor.getValue(),
-        });
-        console.log("sent Document");
+      documentTimer = setTimeout(() => {
+        if (cachedDocument != editor.getValue()) {
+          cachedDocument = editor.getValue();
+          socket.emit("sync_document", {
+            sessionID: sessionID,
+            document: editor.getValue(),
+          });
+          console.log("sent Document");
+        } else {
+          console.log("Document same as cached document, not sending document");
+        }
         updateDocument();
       }, 15000);
     }
@@ -164,6 +169,7 @@ export default function EditorPage() {
       });
     });
     socket.on("Student_Show_AI", (e) => {
+      console.log("Student_Show_AI");
       if (userRole.current === "student") {
         setLLM_Response(e.message);
         setLLM_TIP(true);
@@ -219,10 +225,18 @@ export default function EditorPage() {
       if (e.output.type === "error") {
         console.log(userRole.current);
         if (userRole.current === "mentor") {
-          setLLM_Response(
-            await runLLM_investigation(e.output.result, language)
-          );
-          setLLM_TIP(true);
+          socket.emit("run_LLM", {
+            sessionID: sessionID,
+            document: editor.getValue(),
+            output: e.output.result,
+            language: language,
+          });
+          socket.on("LLM_Response", (e) => {
+            console.log(e);
+            setLLM_Response(e.response);
+            setLLM_TIP(true);
+          });
+          // await runLLM_investigation(e.output.result, language)
         }
       }
       console.log(e.output);
@@ -394,7 +408,7 @@ export default function EditorPage() {
               >
                 Export
               </button>
-              {userRole.current === "student" || (
+              {userRole.current != "mentor" || (
                 <button
                   title="Toggle AI suggestions on error"
                   className=" ml-5 bg-gray-900 border border-gray-700
