@@ -6,7 +6,7 @@ import { supabase } from "../lib/supabaseClient";
 import Alert from "@mui/material/Alert";
 import AlertTitle from "@mui/material/AlertTitle";
 import Button from "@mui/material/Button";
-
+import STDIN_manager from "../components/STDIN_manager";
 async function getPostDetails() {
   const { data: postData, error: postError } = await supabase
     .from("posts")
@@ -27,7 +27,6 @@ async function getPostDetails() {
     AI_Suggestions: postData.AI_Suggestions,
   };
 }
-const apiKey = import.meta.env.VITE_OPENROUTER_API_KEY;
 
 export default function EditorPage() {
   const sessionID = window.location.pathname.split("/")[2];
@@ -335,7 +334,7 @@ export default function EditorPage() {
           split="vertical"
           defaultSize="60%"
           height="100px"
-          style={{ height: "93vh" }}
+          style={{ height: "90vh" }}
           minSize={250}
           maxSize={-300}
           className=" p-8 mb-4  bg-gray-800"
@@ -371,7 +370,7 @@ export default function EditorPage() {
             </div>
             <Editor
               width="100%"
-              height="94%"
+              height="92%"
               language={language.toLowerCase()}
               theme="vs-dark"
               onMount={(editor) => {
@@ -413,7 +412,11 @@ export default function EditorPage() {
                 </p>
               </div>
             </div>
-            <div className="h-full bg-gray-900 shadow-xl rounded-br-xl p-6 flex flex-col space-y-4 border border-l-0 border-gray-700"></div>
+            <div className="h-full bg-gray-900 shadow-xl rounded-br-xl p-6 flex flex-col space-y-4 border border-l-0 border-gray-700">
+              <div className="">
+                <STDIN_manager />
+              </div>
+            </div>
           </SplitPane>
         </SplitPane>
       </div>
