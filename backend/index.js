@@ -36,7 +36,7 @@ const io = new Server(server, {
   },
 });
 
-async function runCode(text, language_id) {
+async function runCode(text, language_id, stdin) {
   const options = {
     method: "POST",
     headers: {
@@ -47,6 +47,7 @@ async function runCode(text, language_id) {
     body: JSON.stringify({
       source_code: text,
       language_id: language_id,
+      stdin: stdin,
     }),
   };
   const res = await fetch(url, options);
@@ -176,7 +177,12 @@ Your Hint: (Give a small, direct hint. Point them to the right line or concept. 
       sessionID: event.sessionID,
     });
     console.log("code running");
-    const output = await runCode(event.document, event.language_id);
+    const output = await runCode(
+      event.document,
+      event.language_id,
+      event.stdin
+    );
+    console.log("stdin", event.stdin);
     io.to(event.sessionID).emit("code_execution_output", {
       sessionID: event.sessionID,
       output: output,
@@ -197,6 +203,14 @@ Your Hint: (Give a small, direct hint. Point them to the right line or concept. 
         .to(sessionID)
         .emit("remote_editorChange", { changedData: event.dataChanged });
       // console.log("data changed: ", event.dataChanged);
+    });
+    socket.on("update_Input", (event) => {
+      const sessionID = event.sessionID;
+      console.log(event.stdinList);
+      socket.to(sessionID).emit("remote_update_Input", {
+        sessionID: sessionID,
+        stdinList: event.stdinList,
+      });
     });
     socket.on("cursorChange", (event) => {
       const sessionID = event.sessionID;

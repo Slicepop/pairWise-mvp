@@ -38,6 +38,7 @@ export default function EditorPage() {
   const userRole = useRef("");
   const [LLM_TIP, setLLM_TIP] = useState(false);
   const [LLM_Response, setLLM_Response] = useState("");
+  const [stdinList, setStdinList] = useState([]);
   useEffect(() => {
     getPostDetails().then((det) => {
       if (det.threadName) setLanguage(det.threadName);
@@ -123,6 +124,10 @@ export default function EditorPage() {
         setLLM_TIP(true);
       }
     });
+    socket.on("remote_update_Input", (e) => {
+      setStdinList(e.stdinList);
+      console.log(stdinList);
+    });
     socket.on("update_document", (e) => {
       remoteUpdating = true;
       editor.setValue(e.document);
@@ -166,7 +171,6 @@ export default function EditorPage() {
       setLLM_TIP(false);
 
       setOutputText("Running....");
-      console.log("running");
     });
     socket.on("code_execution_output", async (e) => {
       setOutputText(e.output.result + "\n  " + e.output.time + "ms");
@@ -220,10 +224,17 @@ export default function EditorPage() {
       setOutputText("Document cannot be blank!");
       return;
     }
+    let stdinString;
+    if (stdinList.length > 0) {
+      stdinString = stdinList.join("\n");
+    }
+    console.log("stdinString: ", stdinString);
+    console.log("stindarr: ", stdinList);
     socketRef.current.emit("initiate_code_execution", {
       sessionID: sessionID,
       document: editorRef.current.getValue(),
       language_id: language_ID,
+      stdin: stdinString,
     });
   }
   function handleImport() {
@@ -234,8 +245,6 @@ export default function EditorPage() {
       const file = inp.files[0];
       const reader = new FileReader();
       reader.addEventListener("load", (e) => {
-        console.log(e);
-        console.log(reader.result);
         editorRef.current.setValue(reader.result);
       });
       if (file) reader.readAsText(file);
@@ -383,7 +392,6 @@ export default function EditorPage() {
                 wordWrap: "on",
                 lineNumbers: "on",
                 automaticLayout: true,
-                minimap: { enabled: false },
               }}
             />
           </div>
@@ -393,7 +401,7 @@ export default function EditorPage() {
             minSize={250}
             maxSize={-100}
             className="h-full w-full"
-            resizerClassName="bg-gray-600 hover:bg-blue-500 transition-colors duration-200 h-2 cursor-row-resize"
+            resizerClassName="bg-gray-600 hover:bg-blue-500 transition-colors duration-200 h-2 min-h-2 cursor-row-resize"
           >
             <div className="h-full w-full bg-gray-900 shadow-xl rounded-tr-xl p-6 flex flex-col space-y-4 border border-l-0 border-gray-700">
               <div className="flex items-center justify-between">
@@ -413,8 +421,13 @@ export default function EditorPage() {
               </div>
             </div>
             <div className="h-full bg-gray-900 shadow-xl rounded-br-xl p-6 flex flex-col space-y-4 border border-l-0 border-gray-700">
-              <div className="">
-                <STDIN_manager />
+              <div className="h-full min-h flex flex-col overflow-y">
+                <STDIN_manager
+                  stdinList={stdinList}
+                  setStdinList={setStdinList}
+                  socketRef={socketRef}
+                  sessionID={sessionID}
+                />
               </div>
             </div>
           </SplitPane>
