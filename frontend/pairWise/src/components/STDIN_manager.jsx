@@ -24,7 +24,7 @@ export default function STDIN_manager(props) {
     });
   }
   return (
-    <div className="h-full flex flex-col min-h-0  border border-blue-500 ">
+    <div className="h-full flex flex-col min-h-0   ">
       <div className="flex p-2 ">
         <input
           type="text"
@@ -41,7 +41,7 @@ export default function STDIN_manager(props) {
           ✔
         </button>
       </div>
-      <div className=" border border-red-500 flex flex-col pl-10 p-2 overflow-y-auto flex-grow min-h-0 ">
+      <div className=" flex flex-col pl-10 p-2 overflow-y-auto flex-grow min-h-0 ">
         {props.stdinList.map((item, index) => (
           <STDIN_item
             key={index}
