@@ -81,8 +81,8 @@ export default function EditorPage() {
   const [outputText, setOutputText] = useState("Output:");
   function editorInit(editor) {
     let remoteUpdating;
-    // const socket = io("https://pairwise-mvp.onrender.com");
-    const socket = io("http://localhost:10000");
+    const socket = io("https://pairwise-mvp.onrender.com");
+    // const socket = io("http://localhost:10000");
     socketRef.current = socket;
     let documentTimer;
     let cachedDocument;
@@ -392,6 +392,7 @@ export default function EditorPage() {
                 wordWrap: "on",
                 lineNumbers: "on",
                 automaticLayout: true,
+                minimap: { enabled: false },
               }}
             />
           </div>

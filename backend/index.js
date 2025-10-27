@@ -7,13 +7,12 @@ const app = express();
 const server = createServer(app);
 import dotenv from "dotenv";
 dotenv.config();
-const FRONTED_URL = "http://localhost:5173";
 const apiKey = process.env.OPENROUTER_API_KEY;
-// const FRONTED_URL = "https://pair-wise.vercel.app";
+// const FRONTED_URL = "http://localhost:5173";
+const FRONTED_URL = "https://pair-wise.vercel.app";
 app.use(
   cors({
-    // origin: FRONTED_URL,
-    origin: "http://localhost:5173",
+    origin: FRONTED_URL,
 
     methods: ["GET", "POST"],
     credentials: true,
@@ -28,8 +27,7 @@ const io = new Server(server, {
   path: "/socket.io",
 
   cors: {
-    // origin: FRONTED_URL,
-    origin: "http://localhost:5173",
+    origin: FRONTED_URL,
 
     methods: ["GET", "POST"],
     credentials: true,
